@@ -1,8 +1,10 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19). Research only, non-normative.** This report changes no specification, decision,
-status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
-FE computation or Auto-ID was run.
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20). Research only, non-normative.** This report changes no specification, decision,
+status, evidence, registration, criterion or catalogue entry. It releases no material constant. No LM, parameter fit
+or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in two sections: one ODB
+extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction (§19). §1–§17 and §20
+ran no Abaqus; they read existing FE results.
 
 - **Scope (owner).** The sandwich panels are set aside. One specimen is studied: `PLATE-300x300x1mm`, series
   `NEXP29/PLATE300-1MM/S261027-ROTATED`.
@@ -1560,6 +1562,231 @@ The field, its assumptions and the model were fixed and hashed before the solve.
   `fig_first_ranked_three_models.png`.
 
 Nothing is published in the repository except this section. No INP, ODB, solver file or extraction is committed.
+
+## 20. PLATE-0875-MATERIAL-SENSITIVITY-01 — do the existing material-parameter variants explain the remaining discrepancies? (2026-11-25)
+
+**Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** No Abaqus solve and no
+ODB extraction was run: only FE packages that already exist were read. Nothing was fitted. No registration,
+orientation or material value is selected by MAC. E1 and E2 are **directions of the FE model** (E1 along FE X, E2
+along FE Y, placement D, `CONVENTION_ONLY`); they are not verified fibre directions. No FrozenRegistration was
+created; the registration guard is unchanged and was not bypassed. M8 GATE NOT_MET, D-077
+`NO_GLOBAL_PARAMETER_VALUE` and production Auto-ID BLOCKED are unchanged.
+
+**Short answer.**
+
+- **Shapes.** G12 and a common scaling of E1 = E2 do not change any shape (first-ranked MAC changes ≤ 0.04). A
+  difference between E1 and E2 changes exactly two records: record 2 (0.60 → 0.81–0.94) and record 8
+  (0.43 → 0.69–0.86). It leaves record 7 at 0.79 and the other eight records where they were.
+- **Frequencies.** A lower common E (the archived states H1 and H2, E −22 % and −25 %) brings the mean first-ranked
+  frequency error of the six records with a supported shape from 9.2 % to 1.6–1.7 %. The thickness models do not.
+- **Material against thickness.** Neither explains more than the other; they act on different things. Thickness
+  asymmetry is needed for record 7 (0.96–0.97; no material variant moves it). Records 2 and 8 respond to **any**
+  break of the X ↔ Y symmetry, material or thickness, so they do not show which one is present. Records 3, 4, 5, 6,
+  9, 10 and 11 are explained by none of the 16 models.
+- **Lower bending modes.** Material asymmetry helps one of the five records 2–6 (record 2), as the 20-reading
+  thickness field does.
+
+### 20.1 The variants and their identities
+
+All are the baseline `S4R_0875_BASELINE` with one changed `*Elastic` line: the same mesh, thickness 0.875 mm, density,
+mass 118.361 g and free-free conditions. Checked for each: the INP differs from the baseline in that one line only;
+its parsed constants equal the declared ones; INP SHA-256 = the recorded one; ODB or manifest SHA-256 = the recorded
+one; the extraction manifest names its own job's ODB; manifest frequencies = `.dat`; the archived run completed
+without error.
+
+| Model | E1 / E2 / G12, MPa | Source | Branches tracked (FE-to-FE MAC ≥ 0.90) | Lost | Order exchanges |
+|---|---|---|---|---|---|
+| G12 −5 % | 56 000 / 56 000 / 4 750 | PRIORITY-2 | 14 of 14 (min 1.00) | none | none |
+| S0: G12 4 763 | 56 000 / 56 000 / 4 763.4 | PRIORITY-4 | 14 of 14 (min 1.00) | none | none |
+| G12 +5 % | 56 000 / 56 000 / 5 250 | PRIORITY-2 | 14 of 14 (min 1.00) | none | none |
+| G12 ×2 | 56 000 / 56 000 / 10 000 | PRIORITY-1 (R6.6) | 13 of 14 | 19 | 20 → 19 |
+| G12 ×3 | 56 000 / 56 000 / 15 000 | PRIORITY-1 (R6.6) | 13 of 14 | 19 | 20 → 19 |
+| E1 −5 % | 53 200 / 56 000 / 5 000 | PRIORITY-2 | 14 of 14 (min 0.92) | none | none |
+| E1 +5 % | 58 800 / 56 000 / 5 000 | PRIORITY-2 | 9 of 14 | 8, 9, 15, 16, 20 | 10 ↔ 11, 13 ↔ 14, 17 ↔ 18 |
+| E2 −5 % | 56 000 / 53 200 / 5 000 | PRIORITY-2 | 9 of 14 | 8, 9, 15, 16, 20 | 10 ↔ 11, 13 ↔ 14, 17 ↔ 18 |
+| E2 +5 % | 56 000 / 58 800 / 5 000 | PRIORITY-2 | 14 of 14 (min 0.92) | none | none |
+| E1 −10 % | 50 400 / 56 000 / 5 000 | PRIORITY-1 (R6.7) | 9 of 14 | 8, 9, 15, 16, 20 | 14 → 15 |
+| E2 −10 % | 56 000 / 50 400 / 5 000 | PRIORITY-1 (R6.7) | 9 of 14 | 8, 9, 15, 16, 20 | 10 ↔ 11, 13 ↔ 14, 17 ↔ 18 |
+| H1 | 43 467 / 43 467 / 4 804.4 | PRIORITY-4 | 14 of 14 (min 1.00) | none | none |
+| H2 | 41 952.8 / 41 952.8 / 4 810.3 | PRIORITY-4 | 14 of 14 (min 1.00) | none | none |
+
+- **Branch stability.** G12 and the common E scaling keep every shape (FE-to-FE MAC ≥ 0.9996 in S0, H1, H2). A
+  difference between E1 and E2 is what breaks branches: the pairs FE 8 / 9 and FE 15 / 16 lose their individual
+  identity and FE 20 is lost, while their two-mode subspaces stay (largest principal angle below 0.5°).
+- **Reuse.** The tracking recomputed here reproduces the stored tables: 66 rows of PRIORITY-2 and 42 rows of
+  PRIORITY-4 agree in frequency to 0.005 Hz and in status. The only difference is a name: PRIORITY-2 calls FE 15 / 16
+  one cluster term where this run lists two tracked branches (MAC 0.92). The exchanges and losses of PRIORITY-1 §3
+  are reproduced.
+- **S0, H1 and H2** are the states of the hypothetical inverse fits of PRIORITY-3 / -4. They are used here only as
+  existing FE states with a lower G12 or a lower common E. Their pairings are hypotheses and are not adopted.
+
+### 20.2 Shapes: research MAC with the first-ranked FE mode
+
+Mapping, metric and levels exactly as in §17. The baseline row reproduces §17.3 and §19.5 with difference 0.0. The
+two thickness rows are copied from §19 (not recomputed). Bold: ≥ 0.80, the existing level, descriptive only.
+
+| Model | EXP 1 | EXP 2 | EXP 3 | EXP 4 | EXP 5 | EXP 6 | EXP 7 | EXP 8 | EXP 9 | EXP 10 | EXP 11 | Mean 2–6 | Mean 7–8 | Mean all |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Baseline | **0.91** | 0.60 | 0.31 | 0.55 | 0.48 | 0.52 | 0.79 | 0.43 | 0.26 | 0.15 | 0.54 | 0.494 | 0.607 | 0.504 |
+| G12 −5 % | **0.91** | 0.60 | 0.31 | 0.55 | 0.48 | 0.52 | 0.79 | 0.43 | 0.26 | 0.15 | 0.54 | 0.493 | 0.606 | 0.503 |
+| S0: G12 4 763 | **0.91** | 0.60 | 0.31 | 0.55 | 0.48 | 0.52 | 0.79 | 0.43 | 0.26 | 0.15 | 0.54 | 0.493 | 0.606 | 0.503 |
+| G12 +5 % | **0.91** | 0.60 | 0.31 | 0.55 | 0.48 | 0.52 | 0.79 | 0.43 | 0.26 | 0.15 | 0.54 | 0.494 | 0.607 | 0.504 |
+| G12 ×2 | **0.91** | 0.61 | 0.31 | 0.55 | 0.49 | 0.54 | 0.79 | 0.44 | 0.26 | 0.15 | 0.57 | 0.498 | 0.615 | 0.510 |
+| G12 ×3 | **0.91** | 0.61 | 0.31 | 0.55 | 0.49 | 0.55 | 0.79 | 0.45 | 0.26 | 0.15 | 0.58 | 0.501 | 0.621 | 0.514 |
+| E1 −5 % | **0.91** | **0.82** | 0.36 | 0.55 | 0.48 | 0.52 | 0.79 | 0.70 | 0.26 | 0.21 | 0.54 | 0.547 | 0.741 | 0.557 |
+| E1 +5 % | **0.91** | **0.84** | 0.26 | 0.55 | 0.48 | 0.52 | 0.79 | 0.69 | 0.26 | 0.21 | 0.54 | 0.530 | 0.740 | 0.549 |
+| E2 −5 % | **0.91** | **0.84** | 0.26 | 0.55 | 0.48 | 0.52 | 0.79 | 0.71 | 0.26 | 0.21 | 0.54 | 0.532 | 0.746 | 0.552 |
+| E2 +5 % | **0.91** | **0.81** | 0.36 | 0.55 | 0.48 | 0.52 | 0.79 | 0.69 | 0.26 | 0.21 | 0.54 | 0.545 | 0.737 | 0.556 |
+| E1 −10 % | **0.91** | **0.89** | 0.37 | 0.55 | 0.48 | 0.52 | 0.79 | **0.80** | 0.26 | 0.23 | 0.54 | 0.562 | 0.795 | 0.576 |
+| E2 −10 % | **0.91** | **0.94** | 0.28 | 0.55 | 0.48 | 0.52 | 0.79 | **0.86** | 0.26 | 0.24 | 0.54 | 0.556 | 0.823 | 0.579 |
+| H1: E −22.4 % | **0.91** | 0.61 | 0.31 | 0.55 | 0.49 | 0.52 | 0.79 | 0.43 | 0.26 | 0.15 | 0.55 | 0.495 | 0.609 | 0.505 |
+| H2: E −25.1 % | **0.91** | 0.61 | 0.31 | 0.55 | 0.49 | 0.53 | 0.79 | 0.43 | 0.26 | 0.15 | 0.55 | 0.495 | 0.610 | 0.506 |
+| Thickness: wedge, thick at edge 4 (§18) | **0.92** | 0.64 | 0.22 | 0.50 | 0.47 | 0.48 | **0.97** | 0.65 | 0.24 | 0.16 | 0.46 | 0.463 | 0.811 | 0.520 |
+| Thickness: field of 20 readings (§19, assumed) | **0.93** | **0.80** | 0.25 | 0.49 | 0.48 | 0.49 | **0.96** | 0.53 | 0.24 | 0.11 | 0.43 | 0.503 | 0.745 | 0.519 |
+
+**What happens inside the near-degenerate pairs.** MAC of the record with the lower and the upper mode of the pair,
+and its share in the two-mode subspace (in brackets; a share is not a confirmed cluster).
+
+| Model | EXP 2 in FE 8 / 9: lower / upper (share) | EXP 8 in FE 15 / 16: lower / upper (share) | EXP 7 in FE 13 / 14: E1 branch / E2 branch (share) |
+|---|---|---|---|
+| Baseline, all G12 variants, H1, H2 | 0.57 / 0.60–0.61 (0.97) | 0.36 / 0.43–0.45 (0.92) | 0.00 / 0.79 (0.79) |
+| E1 −5 % | 0.29 / 0.82 (0.97) | 0.14 / 0.70 (0.92) | 0.00 / 0.79 (0.79) |
+| E2 +5 % | 0.30 / 0.81 (0.97) | 0.15 / 0.69 (0.92) | 0.00 / 0.79 (0.79) |
+| E1 −10 % | 0.16 / 0.89 (0.97) | 0.07 / 0.80 (0.92) | 0.00 / 0.79 (0.79) |
+| E1 +5 % | 0.84 / 0.28 (0.97) | 0.69 / 0.14 (0.92) | 0.00 / 0.79 (0.79) |
+| E2 −5 % | 0.84 / 0.26 (0.97) | 0.71 / 0.13 (0.92) | 0.00 / 0.79 (0.79) |
+| E2 −10 % | 0.94 / 0.08 (0.97) | 0.86 / 0.04 (0.92) | 0.00 / 0.79 (0.79) |
+
+- **The pair share never changes** (0.97, 0.92, 0.79 in all 14 models). A material asymmetry only rotates the two
+  FE shapes inside a subspace that already contains the record. With E1 ≠ E2 the two shapes of a pair separate into
+  one governed by E1 and one governed by E2; records 2 and 8 resemble the one governed by E2 (FE Y).
+- **Both signs give a high MAC.** With E1 < E2 the record resembles the upper mode of the pair (0.81–0.89), with
+  E1 > E2 the lower one (0.84–0.94). **The MAC therefore does not show the sign of E1 − E2**, and it rises
+  monotonically with the size of the step, so it shows no magnitude either. No sign and no value is chosen.
+- **Record 7 is untouched.** It resembles the E2-governed bending shape at 0.79 in every material variant, including
+  both signs. Only a thickness gradient along X raises it (0.96–0.97), by concentrating the shape in the thin half.
+  A homogeneous material cannot do that: every material variant keeps the mirror symmetries of the plate.
+- **Records 4, 5, 6 and 11** do not change by more than 0.04 in any material variant; records 3, 9 and 10 by not
+  more than 0.09.
+
+### 20.3 Frequencies: signed error of the first-ranked FE mode
+
+(FE − EXP) / EXP. The FE mode number is the variant's own. A record whose MAC is below 0.50 has no supported
+correspondence; its error is shown for completeness only.
+
+| Model | EXP 1 | EXP 2 | EXP 3 | EXP 4 | EXP 5 | EXP 6 | EXP 7 | EXP 8 | EXP 9 | EXP 10 | EXP 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Baseline | FE 7: +2.4 % | FE 9: +13.5 % | FE 20: outside | FE 11: +8.0 % | FE 10: −3.2 % | FE 12: +3.8 % | FE 14: +15.5 % | FE 16: +14.0 % | FE 13: −1.0 % | FE 15: −3.0 % | FE 18: +11.7 % |
+| G12 −5 % | FE 7: −0.1 % | FE 9: +13.5 % | FE 20: outside | FE 11: +7.3 % | FE 10: −3.8 % | FE 12: +2.7 % | FE 14: +15.5 % | FE 16: +13.7 % | FE 13: −1.0 % | FE 15: −3.2 % | FE 18: +10.9 % |
+| S0: G12 4 763 | FE 7: +0.0 % | FE 9: +13.5 % | FE 20: outside | FE 11: +7.3 % | FE 10: −3.8 % | FE 12: +2.8 % | FE 14: +15.5 % | FE 16: +13.7 % | FE 13: −1.0 % | FE 15: −3.2 % | FE 18: +10.9 % |
+| G12 +5 % | FE 7: +4.8 % | FE 9: +13.5 % | FE 20: outside | FE 11: +8.7 % | FE 10: −2.5 % | FE 12: +4.9 % | FE 14: +15.5 % | FE 16: +14.2 % | FE 13: −1.0 % | FE 15: −2.7 % | FE 18: +12.4 % |
+| G12 ×2 | FE 7: +42.7 % | FE 9: +13.5 % | FE 19: outside | FE 11: +21.3 % | FE 10: +8.8 % | FE 12: +23.1 % | FE 14: +15.5 % | FE 16: +19.1 % | FE 13: −1.0 % | FE 15: +1.6 % | FE 18: +25.5 % |
+| G12 ×3 | FE 7: +72.7 % | FE 9: +13.5 % | FE 19: outside | FE 11: +32.8 % | FE 10: +19.2 % | FE 12: +38.8 % | FE 14: +15.6 % | FE 16: +23.8 % | FE 13: −1.0 % | FE 15: +5.8 % | FE 18: +37.3 % |
+| E1 −5 % | FE 7: +2.3 % | FE 9: +12.8 % | FE 20: outside | FE 11: +8.0 % | FE 10: −4.9 % | FE 12: +3.1 % | FE 14: +15.5 % | FE 16: +13.3 % | FE 13: −3.5 % | FE 15: −4.6 % | FE 18: +11.4 % |
+| E1 +5 % | FE 7: +2.4 % | FE 8: +10.8 % | FE 10: +13.7 % | FE 10: +8.0 % | FE 11: −1.5 % | FE 12: +4.6 % | FE 13: +15.5 % | FE 15: +11.8 % | FE 14: +1.4 % | FE 16: +1.1 % | FE 17: +11.9 % |
+| E2 −5 % | FE 7: +2.3 % | FE 8: +8.0 % | FE 10: +11.6 % | FE 10: +6.0 % | FE 11: −3.2 % | FE 12: +3.1 % | FE 13: +12.6 % | FE 15: +9.3 % | FE 14: −1.0 % | FE 16: −1.1 % | FE 17: +9.9 % |
+| E2 +5 % | FE 7: +2.4 % | FE 9: +15.6 % | FE 20: outside | FE 11: +9.9 % | FE 10: −3.2 % | FE 12: +4.6 % | FE 14: +18.4 % | FE 16: +15.9 % | FE 13: −1.0 % | FE 15: −2.4 % | FE 18: +13.4 % |
+| E1 −10 % | FE 7: +2.3 % | FE 9: +12.5 % | FE 20: outside | FE 11: +7.9 % | FE 10: −6.7 % | FE 12: +2.4 % | FE 15: +15.5 % | FE 16: +13.1 % | FE 13: −6.1 % | FE 14: −6.7 % | FE 18: +11.2 % |
+| E2 −10 % | FE 7: +2.3 % | FE 8: +5.6 % | FE 9: −3.9 % | FE 10: +4.0 % | FE 11: −3.2 % | FE 12: +2.3 % | FE 13: +9.6 % | FE 15: +7.0 % | FE 14: −1.0 % | FE 16: −1.5 % | FE 17: +8.1 % |
+| H1: E −22.4 % | FE 7: −0.0 % | FE 9: +0.0 % | FE 20: outside | FE 11: −1.9 % | FE 10: −12.0 % | FE 12: −4.1 % | FE 14: +1.8 % | FE 16: +1.6 % | FE 13: −12.8 % | FE 15: −13.5 % | FE 18: +1.5 % |
+| H2: E −25.1 % | FE 7: −0.0 % | FE 9: −1.7 % | FE 20: outside | FE 11: −3.0 % | FE 10: −13.1 % | FE 12: −4.9 % | FE 14: +0.0 % | FE 16: −0.0 % | FE 13: −14.3 % | FE 15: −14.9 % | FE 18: +0.3 % |
+| Thickness: wedge (§18) | FE 7: +2.0 % | FE 8: +8.7 % | FE 11: +13.6 % | FE 11: +7.9 % | FE 10: −3.8 % | FE 12: +3.3 % | FE 13: +12.5 % | FE 16: +14.3 % | FE 14: −1.6 % | FE 15: −3.0 % | FE 18: +11.2 % |
+| Thickness: field (§19) | FE 7: +4.5 % | FE 8: +10.2 % | FE 10: +15.4 % | FE 10: +9.6 % | FE 11: −0.2 % | FE 12: +4.9 % | FE 13: +13.8 % | FE 16: +15.9 % | FE 14: −0.0 % | FE 15: −1.3 % | FE 18: +12.3 % |
+
+- **G12 moves record 1 only** (the twist; +2.4 % → 0.0 % at G12 4 763) and leaves the bending errors at +13…+16 %.
+- **E1 ≠ E2 at 5–10 % moves the bending errors by a few per cent.** The E2-reduced variants lower them most
+  (records 2, 7, 8: +5.6 %, +9.6 %, +7.0 % at E2 −10 %); none closes them.
+- **A common E −22 % to −25 % closes them.** Mean absolute error of the six records whose baseline MAC is at least
+  0.50 (records 1, 2, 4, 6, 7, 11): 9.2 % (baseline) → 1.6 % (H1) and 1.7 % (H2). In H1, records 1 and 8 were
+  fitted; records 2, 4, 7 and 11 were not and come within ±2 %, record 6 within −4.1 %. In H2, records 1 and 7 were
+  fitted; records 2, 8 and 11 come within ±2 %, record 4 within −3.0 % and record 6 within −4.9 %.
+- **Three records move the other way.** Records 5, 9 and 10 go to −12…−15 % in H1 and H2. Their MAC is 0.48, 0.26
+  and 0.15: their first-ranked modes are not supported correspondences, so this is not evidence against a lower E;
+  it shows that these records are unexplained.
+- **What a lower E means here.** The weighed mass fixes the areal mass, so a frequency fixes D = E h³ / 12(1 − ν12 ν21)
+  and not E. "E −22 %" is one way to write a lower bending stiffness; the thickness cubed could carry part of it,
+  and so could an added mass (below). The archived values of H1 and H2 remain `HYPOTHETICAL_PAIRING` and
+  `NOT_A_MATERIAL_PROPERTY`; none is adopted or re-derived here.
+
+Figure: `fig_material_sensitivity.png` (§20.7): both tables as heat maps, material and thickness models together.
+
+### 20.4 Material asymmetry against thickness, suspension and sensor
+
+| Effect | FE evidence available | What it changes | What it cannot explain |
+|---|---|---|---|
+| G12 | 5 variants | the frequency of record 1; no shape | any bending record |
+| Common E (E1 = E2), equivalently D | 2 variants (H1, H2) | the frequencies of the bending records with a supported shape; no shape | any shape discrepancy |
+| E1 ≠ E2 | 6 variants, both signs | the shapes of records 2 and 8 (rotation inside FE 8 / 9 and FE 15 / 16) | record 7; records 3–6, 9–11; the frequency level |
+| Thickness gradient along X | wedge (§18), 20-reading field (§19, assumed) | record 7 (0.96–0.97); records 2 (0.64–0.80) and 8 (0.53–0.65) | records 3–6, 9–11; the frequency level |
+| Suspension (two bands) | **none** (the prepared jobs of §14 were never run) | unknown | — |
+| Force sensor mass | **none** (its mass and point are not recorded) | unknown | — |
+
+- **Material asymmetry and thickness asymmetry are confounded for records 2 and 8.** Both pairs are near-degenerate
+  only because the model is nearly square and balanced. Any effect that distinguishes X from Y splits them the same
+  way. A high MAC of record 2 or 8 in an E1 ≠ E2 variant is therefore not evidence for a material asymmetry.
+- **They are separable for record 7**, which needs a break of the mirror symmetry. That points to a thickness-type
+  (or one-sided mass) asymmetry, not to E1 ≠ E2. It stays a candidate with one orientation of an assumed field.
+- **Suspension and sensor cannot be assessed from the archive.** General mechanics limits their direction only: an
+  added suspension stiffness can only raise the measured frequencies, so it cannot explain FE frequencies that are
+  10–16 % too high; an added sensor mass lowers them and could explain part of what is written above as a lower E.
+  The size is unknown without the sensor's mass.
+- **Existing experimental indication (PRIORITY-1 §4, not new):** by point id, records 1, 2, 6 and 7 of 261016 and
+  261027 have the same shape (0.90, 0.82, 0.97, 0.90) although the suspension changed and the plate was turned 45°,
+  while the frequency of record 1 moved from 33.45 to 18.63 Hz. The shapes of these records travel with the plate;
+  the frequency of record 1 depends on the setup. Where the excitation was attached in 261027 is not recorded.
+
+### 20.5 Remaining identifiability limitations
+
+1. **No material asymmetry can be identified.** The shapes that respond to E1 ≠ E2 respond equally to a thickness
+   asymmetry; the MAC gives neither sign nor size; the partner record of each pair is not identified, so the
+   frequency split is not observed either. E1 ≠ E2 also stays blocked by SPEC §5.2 (no traceable material axes).
+2. **The stiffness level is visible but not assignable.** The records with a supported shape agree with a bending
+   stiffness about a fifth to a quarter below the template, in two archived hypothetical states. It cannot be divided
+   between E, thickness and added mass, and it rests on shape correspondences of 0.52–0.91 with an unverified
+   registration.
+3. **Seven records are explained by no model:** the largest first-ranked MAC over all 16 models is 0.37 (record 3),
+   0.55 (4), 0.49 (5), 0.55 (6), 0.26 (9), 0.24 (10) and 0.58 (11).
+4. **Candidates are not pairs.** Record 1 informs D66 only. Records 2, 7 and 8 reach 0.80 only in models whose
+   distinguishing feature is unverified (assumed thickness field, wedge orientation, unidentified E1 ≠ E2).
+5. **Unchanged:** the registration facts of §16.3, the thickness limits of §19.7, D-044, SPEC §6 S4, M8 GATE NOT_MET
+   and D-077.
+
+### 20.6 Recommended next minimal step
+
+**A thickness map of the plate, with recorded positions. No modal test and no FE run is needed for it.**
+
+- **What:** the thickness at 9 or more interior points and again at the 20 edge points, each with its measured
+  position, the edge numbers 1–4 and the marked face noted on the sheet. If available at the same time: the mass of
+  the force sensor and where it was attached in 261027.
+- **Why this and not a computation:** every open question above ends at the same unmeasured quantity.
+  - It is the only way to separate the two explanations of records 2 and 8: thickness can be measured, E1 ≠ E2
+    cannot.
+  - It decides whether the gradient that explains record 7 exists in the plate, and on which side.
+  - It fixes the placement of the FE model on the plate by construction (§16.3), which no MAC may do.
+  - It turns the bending-stiffness level into a statement about E instead of E h³.
+- **The first computation after it (one solve, separate authorisation):** the baseline with the measured thickness
+  and unchanged constants, compared exactly as in §19. Only if records 2 and 8 then remain mixtures is an E1 ≠ E2
+  variant of that model justified.
+- **Without a new measurement** no further computation is justified by the present data: the archive of material
+  variants is exhausted by this section, and another thickness or material variant could only be chosen by its
+  effect on MAC or frequency, which is excluded.
+
+### 20.7 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `654db699…` and a clean tracked tree before the edit |
+| Input hashes | experiment, nominal geometry, R6 package and the results of §17 (`f8e2d80d…`) and §19 (`61947357…`) equal their recorded hashes; 281 input files have the same size and mtime before and after |
+| FE variant identities | 13 of 13: INP hash, ODB or manifest hash, one changed line, parsed constants, own ODB named by the manifest, manifest = `.dat`, completed run (§20.1) |
+| Branch tracking | one-to-one assignment; the stored PRIORITY-2 and PRIORITY-4 tables reproduced (108 rows, ≤ 0.005 Hz); PRIORITY-1 exchanges and losses reproduced |
+| Research MAC reproducibility | baseline = §17.3 = §19.5 with difference 0.0; identical shapes 1.0; scale and sign ≤ 3.3e-16; in-process repeat 0.0; two complete runs give byte-identical `results.json` and CSV; 289 of 289 points mapped in all 59 scenarios |
+| Tests | `research/m11_r65`: 29 OK. `tests.test_plate_registration_readiness`, `tests.test_plate_rc1_owner_clarification`, `tests.test_plate_study`: 60 OK |
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_MATERIAL_SENSITIVITY_01` (outside git):
+`run_material_sensitivity.py`, `protocol.json`, `results.json` (`35189ace…`), `mac_nominal_all.npz`,
+`material_sensitivity_summary.csv`, `report.py`, `fig_material_sensitivity.png`.
+
+Nothing is published in the repository except this section and the corrected opening statement.
 
 ## Not changed
 
