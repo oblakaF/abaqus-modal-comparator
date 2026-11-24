@@ -1,6 +1,6 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No Abaqus, solver, LM,
 FE computation or Auto-ID was run.
 
@@ -657,6 +657,31 @@ See [`PLATE_WORKBENCH_RC1.md`](PLATE_WORKBENCH_RC1.md). In short:
   - Six registration facts stay open, each resting on a 261016 candidate or on A–D. The verdict is unchanged:
     `PHYSICAL_REGISTRATION_NOT_VERIFIED`.
   - FE applicability variants A–E are prepared; 0 Abaqus solves were run.
+
+## 15. PLATE-0875-OWNER-MATERIAL-CONFIRMATION-01 — the owner's statement of the material family (2026-11-24)
+
+Documentation only. No file was read again, and no provenance audit was repeated. No Abaqus, solver, FE computation,
+LM or Auto-ID was run. No material constant is released; every material parameter stays NOT_IDENTIFIABLE.
+
+| Item | Content | Kind |
+|---|---|---|
+| Statement | The existing 0.875 mm CFRP plate is old T300, from the same material family and supplier as the sandwich face sheets | OWNER_REPORTED |
+| By, date | the owner, 2026-11-24 |  |
+| Provenance | the owner's statement in the PLATE-0875-OWNER-MATERIAL-CONFIRMATION-01 task. A HUMAN record, not governed evidence; no laboratory, supplier or manufacturing record accompanies it |  |
+| Exact batch | not recorded | NOT_VERIFIED |
+| Layup: number of plies, stacking sequence, orientation | not recorded | NOT_VERIFIED |
+| Manufacturing process | not recorded | NOT_VERIFIED |
+
+- **"0.875 mm".** This is the FE model thickness, set to the perimeter mean of the archived readings (§12.2, §13.3).
+  The interior thickness is not measured.
+- **Not established by the statement.** Equal laminate properties of the plate and the SP-02 / SP-13 face sheets;
+  any material constant; a transfer of a plate result to a sandwich. Equivalence is not inferred from thickness,
+  mass, frequency similarity or MAC.
+- **Earlier audits.** PLATE-0875-LOCAL-PROVENANCE-01 and PLATE-0875-ARCHIVED-MANUFACTURING-EVIDENCE-01 (read-only)
+  found no record of the plate's stock, batch, ply count, layup or process. They are closed and are not repeated.
+- **Scope of §1.** The study still uses no sandwich data.
+- **Next.** The physical registration and the experimental readiness of the existing plate: the open items of §12.6
+  and §14 ([roadmap](../../auto_id/ROADMAP.md), owner priority).
 
 ## Not changed
 
