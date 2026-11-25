@@ -1,10 +1,11 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No LM, parameter fit
 or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in two sections: one ODB
 extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction (§19). §1–§17 and
-§20–§22 ran no Abaqus; §21 reads experimental files only, the others read existing FE results.
+§20–§23 ran no Abaqus; §21 reads experimental files only, §23 reads instrument records only, the others read
+existing FE results.
 
 - **Scope (owner).** The sandwich panels are set aside. One specimen is studied: `PLATE-300x300x1mm`, series
   `NEXP29/PLATE300-1MM/S261027-ROTATED`.
@@ -730,7 +731,7 @@ directory, outside git).
 | Fact | What exists | Kind | State | What would close it |
 |---|---|---|---|---|
 | `scan_window_offsets_mm` | 261016: gaps to edge 2 / 4 / 1 / 3 = 56.4 / 29.19 / 7.78 / 7.02 mm (+v / −v / +u / −u). The assignment of each gap to a numbered edge now follows from §16.1. The values are the M11 diagnostic reconstruction: deviation 1 is confirmed by the scanner angles; deviations 2 and 3 rest on the image only (M11 §15.4); uncertain at 1–3 mm | DIAGNOSTIC (values); DERIVED (edge assignment) | **open** | the 261027 `.svd` (its own frame and alignment), or a PSV screenshot of the points over the video; or a SUPERVISOR decision to accept the 261016 reconstruction with its stated uncertainty. A decision is not evidence |
-| `scan_metric_geometry` | 261016: grid shape and scale confirmed by the scanner-angle record (aspect 0.7747 against 0.7553; rms 1.32 mm; M11 §15.4), window about 215.4 × 285.2 mm. 261027: no instrument record of the physical positions; the owner's "same points" carries the 261016 positions; the 261027 UNV grid (277.7 × 277.0 mm) is a representation | INSTRUMENT_RECORD for the 261016 shape; OWNER_REPORTED carry-over to 261027 | **open** | the same as above |
+| `scan_metric_geometry` | 261016: grid shape and scale confirmed by the scanner-angle record (aspect 0.7747 against 0.7553; rms 1.32 mm; M11 §15.4), window about 215.4 × 285.2 mm (**§23: the 215.4 mm is a unit-conversion error, and the scanner-angle check could not detect it; the instrument record gives 287.1 × 285.3 mm**). 261027: no instrument record of the physical positions; the owner's "same points" carries the 261016 positions; the 261027 UNV grid (277.7 × 277.0 mm) is a representation | INSTRUMENT_RECORD for the 261016 shape; OWNER_REPORTED carry-over to 261027 | **open** | the same as above |
 | `fe_origin_corner` | none. The M11 model has no physical landmark; its origin is an artefact of the sketch (M11 §15.1); the owner does not know where the Abaqus axes lie (M11 §15) | not a physical fact | **open — CONVENTION required** | a declared placement recorded as `CONVENTION_ONLY`; or an FE variant that carries a measured asymmetry (the edge thicknesses 1–4), whose construction fixes the correspondence |
 | `fe_normal_face` | none; it follows from the placement: +Z leaves the marked face in A / B and the unmarked face in C / D (M11 §15.2) | not a physical fact | **open — CONVENTION required** | the same placement decision |
 
@@ -788,6 +789,8 @@ convention and a decision are not physical evidence; the verdict stays `PHYSICAL
   reconstruction's point ids; a missing, extra or duplicate id is refused.
 - **Positions.** The 261016 reconstructed positions of the same points on the 301 × 300 mm plate (window about
   215.4 × 285.2 mm; gaps 56.4 / 29.2 / 7.0 / 7.8 mm to the left / right / bottom / top edge in the scanner view).
+  **§23: the 215.4 mm width and the left and right gaps are a unit-conversion error of the reconstruction; the
+  instrument record gives 287.1 × 285.3 mm with gaps of about 7 mm on every side.**
 - **Placement D.** Scan +x → FE +X, +y → +Y, +z → +Z.
 - **Metric.** Complex MAC |eᴴf|² / ((eᴴe)(fᴴf)) over the 289 measured U3 values, bilinear S4R interpolation of the
   FE U3 field (primary) and nearest node (check). No phase is optimised per cell.
@@ -2188,7 +2191,9 @@ Research MAC of each record with its first-ranked FE mode, nominal mapping → c
   and the M11 reconstruction rests on a camera frame and on the scanner angles (§16.3), which this section did not
   re-examine.
 - **Open, for the owner.** The 261027 scan window has no instrument record (§16.4). The two sources now disagree by
-  about 80 mm along X. Nothing is changed here: the nominal mapping stays the nominal mapping.
+  about 80 mm along X. Nothing is changed here: the nominal mapping stays the nominal mapping. **§23 rechecks the
+  261016 instrument record without any modal quantity: the window is 287.1 × 285.3 mm, and the 215 mm width is an
+  error of the reconstruction.**
 
 ### 22.5 Directional bending comparison
 
@@ -2412,6 +2417,215 @@ of §21 do not carry that statement, and it is withdrawn in that form (§21 is a
 `fig_directional_shapes.png`, `fig_directional_frequencies.png`.
 
 Nothing is published in the repository except this section and the amendment of §21.
+
+## 23. PLATE-0875-SCAN-WINDOW-CHECK-01 — the 215 mm and the 294 mm scan width (2026-11-25)
+
+**Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** The section rechecks
+where the 289 scan points of session 261016 lay on the plate. It reads the instrument file of 261016, its stored
+camera frame, the instrument exports of both sessions and the measured plate dimensions. **No modal shape, frequency,
+MAC or FE result is read, and no geometry is selected by one.** No Abaqus, solve, extraction, fit, LM or Auto-ID was
+run. No registration is created or frozen, the nominal mapping file is not changed, and no program code is changed.
+M8 GATE NOT_MET, D-077 `NO_GLOBAL_PARAMETER_VALUE` and production Auto-ID BLOCKED are unchanged. The 261027 `.svd`
+was not searched for.
+
+**Short answer.**
+
+- **Resolved for 261016.** The scan window is about **287.1 × 285.3 mm**, centred on the plate, with gaps of 7.1 /
+  6.8 / 7.0 / 7.7 mm to the left / right / bottom / top edge. The width of 215.4 mm is an error of the
+  reconstruction, not a property of the scan.
+- **The cause is a coordinate conversion.** The instrument file stores the horizontal video coordinate of the scan
+  points in another unit than the stored full-frame rectangle that the reconstruction used for it. The points were
+  therefore compressed to 3/4 of their width and shifted to the right (§23.3).
+- **The hypothetical 294 mm is not confirmed as a number.** The instrument record gives 287 mm. The nodal-line
+  estimate of §22.4 pointed in the right direction and is 7 mm (2.5 %) too wide. It was not used here.
+- **261027.** Its instrument export describes a square grid (aspect 0.9999). Its physical size is not recorded:
+  279 mm if the export scale is taken as stored, 287 × 285 mm if the points are those of 261016 (owner). That
+  difference of about 3 % is **unresolved**. A window of 215 mm along one axis is excluded by either reading.
+- **Consequence, not acted on here.** Every research MAC of §17–§22 used point positions that are wrong by 25.7 mm
+  rms and up to 49.3 mm along FE X. None was recomputed in this task (§23.7).
+
+### 23.1 Inputs
+
+| Input | Content | SHA-256 |
+|---|---|---|
+| Instrument file 261016 | `300by300_plate_only_1mm_261016.svd` (verified copy): scan points, scan object, video alignment, camera frame | `0a770b1b…` = recorded |
+| PSV export 261016 | `…261016.unv`: the instrument's metric geometry of the 289 points | `6d66eafe…` = recorded |
+| PSV export 261027 | `…ROTATED_261027.unv` (acquired 27-Oct-26 11:38:17): node table only | `d3bc99e9…` = recorded |
+| Fitted file 261027 | `…ROTATED_Polytec_261027.unv`: node table only | `76db80ae…` = recorded |
+| M11 reconstruction | `plate_reconstruction_W301xH300.json`, `plate_scan_px.json` | `09be8b88…`, `bd80b5b7…` = recorded |
+| Second edge detector | `reg02_checks.json` (§16.2) | `0bb26277…` = recorded |
+| Stored records of two other sessions | `SP13_…reconstruction.json`, `SP02_…reconstruction.json` (repository; read only, their `.svd` files were not opened) | `c30b78d8…`, `f42e69a1…` (first recorded here) |
+
+- The camera frame extracted here is pixel-identical to the M11 frame `plate_frame_raw.png`.
+- The M11 reconstruction is reproduced from the instrument file before anything else: the recorded pixel positions
+  to 5·10⁻¹³ px and the recorded 289 plate positions to 5·10⁻⁵ mm.
+- All ten input files have the same size, modification time and SHA-256 before and after.
+
+### 23.2 What the instrument file stores
+
+All values are normalised video coordinates as stored in the `.svd` of 261016.
+
+| Stream | Stored | Reading |
+|---|---|---|
+| `VideoSettings` (end) and the header of `MeasPoints` | rectangle u −0.2222 … 1.5556, v 0 … 1 | the full 1920 × 1080 frame in a unit of 1080 px, with u = 0 at pixel 240 |
+| `DefaultSettings` | rectangle u −0.2222 … 1.5556, v −2.4667 … 1.0; then a point list that starts (0, 0), (1.3333, 0), (1.3333, 1) | the same u range; the anomalous v range of M11 deviation 1; and the full frame in a unit of 1440 × 1080 px |
+| `ScanObjects` | the scan object drawn by the operator: u 0.12599 … 0.91027, v 0.08501 … 0.86929 | spans 0.78428 × 0.78428: **a square** in the unit of the first row |
+| `MeasPoints` | the 289 points: u 0.26116 … 0.84937, v 0.08501 … 0.86929; 17 × 17 distinct values | span ratio u / v = **0.7500** |
+
+- **The scan points and the scan object are the same rectangle in two units.** The v extents are identical. The
+  u extents obey u(points) = 0.750000 · u(object) + 0.166667, that is 3/4 · u + 1/6, to 8·10⁻⁸ at both ends.
+- **That relation is the change of unit between the two stored frames.** A coordinate in the unit of 1080 px with its
+  origin at pixel 240 becomes pixel / 1440 by exactly 3/4 · u + 1/6. The scan points are therefore stored as
+  pixel / 1440 horizontally and pixel / 1080 vertically, the normalisation of a 4 : 3 frame.
+- **In pixels** the scan object lies at x 376.07 … 1223.09 and y 91.81 … 938.83. The scan points read as
+  pixel / 1440 lie on it to 0.001 px. The grid is 847.0 × 847.0 px.
+- **Deviation 1 of M11 (v 0 … 1) is supported at the source**: two streams store v 0 … 1.
+
+### 23.3 The error in the reconstruction
+
+`reconstruct` in `src/services/psv_video_registration.py` converts both coordinates of the scan points with the
+rectangle of `DefaultSettings`: `px = (u − u0) · width / (u1 − u0)`, which is 240 + 1080 · u. For the scan points
+the correct conversion is 1440 · u.
+
+| Property of the algorithm | Finding |
+|---|---|
+| Axes and mirror | correct: plate x grows with pixel x, plate y grows upwards from the bottom edge; no exchange and no mirror |
+| Vertical conversion | correct with v 0 … 1 (deviation 1) |
+| Horizontal conversion | **wrong unit**: pixel(M11) = 240 + 0.75 · pixel(true), verified on the 289 points to 6·10⁻⁴ px |
+| Aspect ratio | the grid becomes 635.3 × 847.0 px instead of 847.0 × 847.0 px: 0.7500 of its width |
+| Plate edges and physical scale | not affected: 892.2 × 892.6 px for 301 × 300 mm, 2.964 and 2.975 px / mm |
+| Homography from the four corners | not affected; round trip 1·10⁻¹³ mm |
+
+- **Effect on the points.** Every point moves towards pixel 960. On this plate the left column moves 49.3 mm to the
+  right and the right column 22.4 mm to the left. The vertical positions change by at most 0.2 mm.
+- **Deviation 2 of M11 was a symptom.** The edge search window had to be widened from 150 to 220 px because the
+  compressed grid ended 167 px from the left plate edge. Started from the correct grid, the unchanged detector with
+  its standard 150 px window finds the left, right and top edges 23, 21 and 26 px from the grid (120, 116 and 112
+  samples of 120), at the recorded positions.
+- **Deviation 3 remains.** With the standard polarity the bottom search still takes another structure (42 samples,
+  42 px away). The bottom edge keeps its low-contrast uncertainty (M11 §13.4, §15.4).
+
+### 23.4 Checks that use neither the plate edges nor any mode
+
+| Check | Scan points read as pixel / 1440 | M11 reading |
+|---|---|---|
+| Distance of the point extent from the stored scan object | 0.0003 and 0.0008 px | 146.0 px at the left, 65.8 px at the right |
+| Instrument geometry of the PSV export against the pixels, mm per px, x over y | **0.9966** (0.2942 and 0.2952) | 1.3288 (0.3923 and 0.2952) |
+| Affine residual of that comparison | 0.11 mm rms | the same |
+| Grid in laser angles (13 alignment points) | 13.8° × 13.5° | 10.4° × 13.4° |
+| The square plate itself, in the same angles | 14.4° × 14.0° | the same |
+
+- **The PSV export is the instrument's own metric geometry.** It is proportional to the pixels with one scale in
+  both directions only under the pixel / 1440 reading. Under the M11 reading the instrument would use two scales
+  that differ by a factor of 1.33.
+- **The plate is square in the frame and subtends nearly equal laser angles** (ratio 1.029, the instrument
+  anisotropy seen in every session). A grid that covers the plate to 7 mm on every side must then span nearly the
+  same angles as the plate. 13.8° × 13.5° does; 10.4° × 13.4° is the 215 mm window.
+- **Chance.** Two unrelated extents would satisfy 3/4 · u + 1/6 to the stored precision with a probability below
+  2·10⁻¹¹.
+
+### 23.5 Why the scanner-angle check did not detect this
+
+M11 §15.4 and §16.3 state that the grid shape was confirmed by the scanner angles: aspect 0.7747 against 0.7553,
+rms 1.32 mm. That check maps the scan points to angles with the alignment table. The alignment table is stored in
+the unit of 1080 px; the scan points were fed to it in the wrong unit, the same one the reconstruction used. Both
+sides of the comparison carried the same error.
+
+| Reading of the scan-point u, on both sides | Aspect in angles | Aspect on the plate | Similarity fit, rms / max |
+|---|---|---|---|
+| M11 | 0.7747 | 0.7553 | 1.32 / 2.35 mm (reproduced) |
+| pixel / 1440 | 1.0273 | 1.0064 | 1.56 / 2.78 mm |
+
+Both readings pass. The check confirms that the alignment is nearly isotropic. It cannot tell which reading is
+right, and it was not an independent confirmation of the 215 mm window. The statements of §16.3 and §17.6 that rest
+on it are withdrawn in this respect.
+
+### 23.6 Scan dimensions
+
+Plate 301 mm (horizontal in the 261016 scanner view, FE X under placement D) × 300 mm.
+
+| Geometry | Window, mm | X range, mm | Y range, mm | Gaps left / right / bottom / top, mm | Status |
+|---|---|---|---|---|---|
+| M11 reconstruction (nominal mapping of §17–§22) | 215.4 × 285.2 | 56.4 … 271.8 | 7.0 … 292.2 | 56.4 / 29.2 / 7.0 / 7.8 | **wrong along X** (§23.3) |
+| Instrument record, M11 edge fit | **287.1 × 285.3** | 7.1 … 294.2 | 7.0 … 292.3 | 7.1 / 6.8 / 7.0 / 7.7 | confirmed for 261016 |
+| Instrument record, second edge detector (§16.2) | 286.1 × 284.2 | 8.0 … 294.1 | 7.3 … 291.5 | 8.0 / 6.9 / 7.3 / 8.5 | the same image; not independent |
+| Nodal-line control of §22.4 (quoted; not used) | 294.2 × 292.4 | 2.7 … 296.9 | 3.9 … 296.3 | 2.7 / 4.1 / 3.9 / 3.7 | not confirmed: 7 mm too wide in both directions |
+
+- **Grid pitch:** 17.94 mm along X and 17.83 mm along Y, against 13.46 mm along X in the M11 reconstruction.
+- **Uncertainty.** The grid in pixels is exact to the stored precision. The plate positions carry the uncertainty of
+  the plate edges in the image, 1–3 mm (M11 §15.4), with the largest part at the bottom edge. The two edge
+  detectors differ by at most 1.0 mm.
+- **The 80 mm conflict of §22.4 is resolved in favour of a full-width scan.** The remaining difference between the
+  instrument record and the nodal-line estimate, 3–4 mm on each side, is not resolved here and needs no geometric
+  explanation: that estimate assumed that the measured nodal lines lie where those of a uniform FE plate lie.
+- **Annotated image:** `fig_scan_window.png` (work directory). It shows the plate edges, the stored scan object, the
+  289 points in both readings and the dimensions. It contains the laboratory photograph and is not published.
+
+### 23.7 The 261027 instrument exports
+
+No camera frame and no `.svd` of 261027 are available. The two UNV files carry the instrument's node table; the two
+tables are identical.
+
+| Quantity | 261016 | 261027 |
+|---|---|---|
+| Distance entered in the PSV software (z of every point) | 1.00 m | 1.15 m |
+| Grid of the export along its two axes | 249.2 × 250.1 mm | 279.2 × 279.2 mm |
+| Aspect of the export | 0.9966 | **0.9999** |
+| Angle between the grid axes | 89.96° | 89.99° |
+| Physical window | 287.1 × 285.3 mm (§23.6) | not recorded |
+| Physical over export | 1.152 and 1.141 | not recorded |
+
+- **Shape.** In 261016 an export aspect of 0.9966 belongs to a physical aspect of 1.0064. The 261027 export is
+  square to 0.01 %. A 261027 window with an aspect of 0.755 is excluded by its own export.
+- **Size, unresolved.** Two readings exist, and no record decides between them:
+  - the export as stored, 279.2 × 279.2 mm, which is physical only if the entered 1.15 m was the true distance and
+    the software scale is calibrated; the 261016 export is 14–15 % too small at its entered 1.00 m, which a true
+    distance of about 1.15 m would explain, but that distance is not recorded;
+  - the points of 261016 carried over by the owner's "same points": 287.1 × 285.3 mm.
+- **Per metre of entered distance** the export grid is 249.2 … 250.1 mm in 261016 and 242.8 mm in 261027: 2.7 %
+  smaller. Either the grid was drawn slightly smaller in 261027, or the two true distances were not in the ratio
+  1.15.
+- **Not established for 261027:** the offsets of the grid to the plate edges. They need the camera frame of that
+  session.
+
+### 23.8 What is affected, and what stays open
+
+- **Affected in this report.** §17–§22 used the M11 positions as the nominal mapping. Along FE X those positions are
+  wrong by up to 49.3 mm (25.7 mm rms over the 289 points); along FE Y they are right to 0.2 mm. The research MAC
+  values, the first-ranked FE modes, the "seven records explained by no model" of §20.5 and the window descriptors
+  of §22.3 all depend on them. The frequency comparisons and the whole-plate FE classes do not.
+- **Not recomputed.** No MAC was computed with the corrected positions in this task. The nominal mapping is an
+  owner decision (2026-11-24) and stays in force until the owner changes it. The corrected positions are in
+  `results.json` and `arrays.npz`, labelled `RESEARCH_ONLY`.
+- **Outside this report, flagged only.** The same routine produced the stored reconstruction records of SP-02 and
+  SP-13. Both records carry the same signature: a window aspect of 0.739, an instrument scale that differs by 1.33
+  to 1.34 between the axes, and side gaps of 61–81 mm against 6–14 mm at the top and bottom. Their `.svd` files were
+  not opened here, and nothing was changed. Whether those records are affected has to be checked on their own
+  instrument files.
+- **Open for the owner.**
+  1. Whether the corrected 261016 positions replace the M11 positions as the nominal research mapping, and whether
+     §17–§22 are then recomputed.
+  2. Whether the reconstruction routine and the SP-02 / SP-13 records are reviewed. That concerns accepted evidence
+     and needs a separate authorisation.
+  3. The physical size of the 261027 window (279 or 287 mm) and its offsets: only the instrument record of that
+     session can settle them.
+
+### 23.9 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `f5b78166…` and a clean tracked tree before the edit |
+| Source hashes | seven inputs equal their recorded hashes; all ten unchanged in size, mtime and SHA-256 |
+| Reproduction of the M11 result | pixels to 5·10⁻¹³ px, plate positions to 5·10⁻⁵ mm, window and gaps equal |
+| Coordinate transformations | pixel(M11) = 240 + 0.75 · pixel(true) on the 289 points (6·10⁻⁴ px); scan object = point extent (0.001 px); homography round trip 1·10⁻¹³ mm; axis and mirror convention checked |
+| Synthetic geometry | a known 280 mm grid on a known plate, stored as the instrument stores it: recovered to 2·10⁻¹³ mm by the pixel / 1440 reading; the M11 reading returns 0.7505 of its width with errors up to 48.6 mm. The relation 3/4, 1/6 is recovered from single-precision extents to 2·10⁻⁷ |
+| Reproducibility | two complete runs give byte-identical `results.json` (`6c3005b3…`), `arrays.npz` (`20219eec…`) and `fig_scan_window.png` |
+| Tests | `tests.test_physical_registration`: 24 OK. `tests.test_sp13_physical_registration`: 17 OK (4 skipped). `tests.test_sp02_physical_registration`: 18 OK (6 skipped). `tests.test_plate_physical_review`: 36 OK. `tests.test_plate_registration_readiness`: 18 OK. `tests.test_plate_study`: 30 OK. `tests.test_plate_rc1_owner_clarification`: 12 OK. `research/m11_r65`: 29 OK. The skips are the suites' own (stores not configured) |
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_SCAN_WINDOW_CHECK_01` (outside git): `run_scan_window.py`,
+`results.json`, `arrays.npz`, `report.py`, `fig_scan_window.png`.
+
+Nothing is published in the repository except this section and three pointers to it in §16.3, §17.1 and §22.4.
 
 ## Not changed
 
