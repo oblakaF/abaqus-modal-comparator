@@ -1,11 +1,11 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No LM, parameter fit
 or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in two sections: one ODB
 extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction (§19). §1–§17 and
-§20–§23 ran no Abaqus; §21 reads experimental files only, §23 reads instrument records only, the others read
-existing FE results.
+§20–§24 ran no Abaqus; §21 reads experimental files only, §23 reads instrument records only, the others read
+existing FE results. §24 is the only section that changes program code (`src/services/psv_video_registration.py`).
 
 - **Scope (owner).** The sandwich panels are set aside. One specimen is studied: `PLATE-300x300x1mm`, series
   `NEXP29/PLATE300-1MM/S261027-ROTATED`.
@@ -762,6 +762,8 @@ It is not published: it is a decision aid, not evidence.
 
 ## 17. PLATE-0875-RESEARCH-MAC-01 — research FE / EXP MAC of 261027 and its geometry sensitivity (2026-11-24)
 
+> **Superseded for current research conclusions (§24, 2026-11-26):** the research MAC values, labels, first-ranked modes and scenario ranges of this section. They were computed with point positions that are wrong along FE X by up to 49.3 mm (§23). The text below is kept as written; §24 gives the values recomputed with the corrected positions.
+
 **Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** It is an offline
 diagnostic comparison authorised by the owner. It is not a physical registration, not a governed comparison and not a
 mode pairing. No FrozenRegistration was created. No Abaqus, FE solve, LM, parameter fit or Auto-ID was run, and no
@@ -975,6 +977,8 @@ its MAC is higher.
 Nothing is published in the repository except this section.
 
 ## 18. PLATE-0875-FE-APPLICABILITY-01 — does the existing wedge-thickness model explain part of the shape discrepancy? (2026-11-25)
+
+> **Superseded for current research conclusions (§24, 2026-11-26):** every FE / EXP MAC value of this section and the comparison of the models by MAC. They were computed with point positions that are wrong along FE X by up to 49.3 mm (§23). The text below is kept as written; §24 gives the values recomputed with the corrected positions.
 
 **Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** The wedge is a
 **model-form sensitivity scenario**, not a measured interior thickness field. Nothing here is a mode pairing, a
@@ -1276,6 +1280,8 @@ Nothing is published in the repository except this section. No ODB, solver file 
 
 ## 19. PLATE-0875-THICKNESS-FIELD-01 — a thickness field from all 20 perimeter readings (2026-11-25)
 
+> **Superseded for current research conclusions (§24, 2026-11-26):** every FE / EXP MAC value of this section and the comparison of the models by MAC. They were computed with point positions that are wrong along FE X by up to 49.3 mm (§23). The text below is kept as written; §24 gives the values recomputed with the corrected positions.
+
 **Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** The interior thickness
 of the model is **`ASSUMED_MODEL_FORM`**: it is an interpolation, not measured geometry. Nothing here is a mode
 pairing, a confirmed cluster, a physical registration or a parameter estimate. No material constant, density or
@@ -1568,6 +1574,8 @@ Nothing is published in the repository except this section. No INP, ODB, solver 
 
 ## 20. PLATE-0875-MATERIAL-SENSITIVITY-01 — do the existing material-parameter variants explain the remaining discrepancies? (2026-11-25)
 
+> **Superseded for current research conclusions (§24, 2026-11-26):** the FE / EXP MAC tables of this section, the statement of §20.5 that seven records are explained by no model, and the mean frequency errors of §20.3 taken over records with MAC ≥ 0.50. They were computed with point positions that are wrong along FE X by up to 49.3 mm (§23). The text below is kept as written; §24 gives the values recomputed with the corrected positions.
+
 **Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** No Abaqus solve and no
 ODB extraction was run: only FE packages that already exist were read. Nothing was fitted. No registration,
 orientation or material value is selected by MAC. E1 and E2 are **directions of the FE model** (E1 along FE X, E2
@@ -1792,6 +1800,8 @@ Figure: `fig_material_sensitivity.png` (§20.7): both tables as heat maps, mater
 Nothing is published in the repository except this section and the corrected opening statement.
 
 ## 21. PLATE-0875-EXPERIMENTAL-MODE-QUALITY-01 — are the poorly matched experimental records supported by the response data? (2026-11-25)
+
+> **Superseded for current research conclusions (§24, 2026-11-26):** the reading of the low FE MAC of records 5, 6, 9, 10 and 11 as a discrepancy of the FE model (already qualified in §22.9); the experimental quantities of this section are not affected. They were computed with point positions that are wrong along FE X by up to 49.3 mm (§23). The text below is kept as written; §24 gives the values recomputed with the corrected positions.
 
 **Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** Experimental data only:
 no FE frequency, shape or MAC enters any diagnostic or label of this section. No Abaqus solve and no ODB extraction
@@ -2048,6 +2058,8 @@ The descriptors use the grid's own two indices, called u and v here. They refer 
 Nothing is published in the repository except this section.
 
 ## 22. PLATE-0875-DIRECTIONAL-STIFFNESS-01 — the directional bending stiffness hypothesis against the existing FE results (2026-11-25)
+
+> **Superseded for current research conclusions (§24, 2026-11-26):** the window descriptors of §22.3, the nodal-line control and its MAC table of §22.4, and the expected MAC lists of §22.8; §22.2, §22.5, §22.6 and the falsification criteria are not affected. They were computed with point positions that are wrong along FE X by up to 49.3 mm (§23). The text below is kept as written; §24 gives the values recomputed with the corrected positions.
 
 **Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** No Abaqus solve and no
 ODB extraction was run: only the 16 existing FE packages and the fitted 261027 records were read. Nothing was fitted.
@@ -2594,7 +2606,7 @@ tables are identical.
   wrong by up to 49.3 mm (25.7 mm rms over the 289 points); along FE Y they are right to 0.2 mm. The research MAC
   values, the first-ranked FE modes, the "seven records explained by no model" of §20.5 and the window descriptors
   of §22.3 all depend on them. The frequency comparisons and the whole-plate FE classes do not.
-- **Not recomputed.** No MAC was computed with the corrected positions in this task. The nominal mapping is an
+- **Not recomputed.** No MAC was computed with the corrected positions in this task (**§24 does it**). The nominal mapping is an
   owner decision (2026-11-24) and stays in force until the owner changes it. The corrected positions are in
   `results.json` and `arrays.npz`, labelled `RESEARCH_ONLY`.
 - **Outside this report, flagged only.** The same routine produced the stored reconstruction records of SP-02 and
@@ -2626,6 +2638,386 @@ tables are identical.
 `results.json`, `arrays.npz`, `report.py`, `fig_scan_window.png`.
 
 Nothing is published in the repository except this section and three pointers to it in §16.3, §17.1 and §22.4.
+
+## 24. PLATE-0875-SCAN-NORMALIZATION-FIX-01 — corrected scan normalisation and the recomputed research MAC (2026-11-26)
+
+**Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** The section corrects
+the coordinate normalisation defect of §23 in the program and recomputes the research MAC of the 261027 series with
+point positions taken from the instrument record. **The geometry was fixed before any MAC was computed, and no
+geometry is selected by MAC, shape or frequency.** No Abaqus solve and no ODB extraction was run; the 16 existing FE
+packages and the 11 fitted records were read. Nothing was fitted. No pairing is confirmed, no registration is created
+or frozen, and no material value is released. The SP-02 and SP-13 registrations, passports and evidence records are
+unchanged and were not opened. M8 GATE NOT_MET, D-077 `NO_GLOBAL_PARAMETER_VALUE` and production Auto-ID BLOCKED are
+unchanged.
+
+**Short answer.**
+
+- **The defect is corrected in `src/services/psv_video_registration.py`.** A new reading takes the unit frame of the
+  scan points from the metadata stored in the instrument file, checks it against the stored scan object, and refuses
+  when the metadata are missing, unsupported or ambiguous. No pixel count and no aspect ratio is assumed.
+- **The earlier reading is kept, unchanged, as the default of `reconstruct`.** The governed SP-02 and SP-13 records
+  were made with it and must stay reproducible. Whether the governed tool changes to the new reading is an owner
+  decision (§24.9).
+- **The 261016 window is reproduced: 287.1 × 285.3 mm.**
+- **With the corrected positions the baseline agrees with five records at 0.96–0.99** (records 1, 5, 6, 9, 11) instead
+  of one. The mean research MAC of the first-ranked mode rises from 0.50 to 0.75. Every record lies 0.96–1.00 inside
+  the span of the 14 FE shapes (0.48–1.00 before).
+- **The 279.2 mm alternative changes nothing of substance.** With either assumed offset no first-ranked mode changes
+  and no first-ranked MAC moves by more than 0.034.
+- **The remaining low records are mixtures inside two groups of close modes.** Records 2–5 lie 0.96–0.99 inside the
+  span of FE 8–11, and records 7–10 lie 0.97–0.98 inside the span of FE 13–16. The FE model has the shapes; it
+  combines them differently.
+- **The directional stiffness hypothesis of §22 is strengthened, not confirmed.** The records now identified at
+  0.96–0.99 show its frequency pattern directly, a lower E2 separates the mixed pairs the way the experiment does, and
+  a common lower E is excluded by records 5 and 9. No model with the ratio has been solved.
+- **The proposed test of §22.8, E2 = 41 000 MPa, stands unchanged** and is the recommended next FE step (§24.8).
+
+### 24.1 The correction in the program
+
+The instrument file stores video coordinates in more than one unit frame (§23.2). The corrected reading works from
+what the file stores:
+
+| Stored item | Stream | Use |
+|---|---|---|
+| Full-frame rectangle | `MeasPoints` header, `VideoSettings`, u range of `DefaultSettings` | one candidate frame; the three copies must agree to 1·10⁻⁵ |
+| Frame that opens the default point list | `DefaultSettings` | second candidate frame, when present and different |
+| Scan object drawn by the operator | `ScanObjects` | the reference: one axis-parallel rectangle |
+| Frame size in pixels | the stored JPEG | converts a frame to pixels |
+
+- **Rule.** For each pair of candidate frames (one for the scan object, one for the scan points) the hull of the
+  scan points is compared with the scan object in pixels. Exactly one pair must agree to 0.25 px. That pair gives the
+  frame of the points.
+- **Refusals** (`PSVRegistrationError`, no result): the copies of the full-frame rectangle differ; no pair agrees;
+  more than one pair agrees; the scan object is missing, is not a single object, or is not an axis-parallel
+  rectangle; an unknown reading is requested.
+- **One refusal deserves a note.** When points and scan object are stored in the same unit and the file holds two
+  different frames, both same-frame pairs agree. The file then does not say which frame gives pixels, and the routine
+  refuses.
+- **Record.** The new reading writes schema `…/v2` with the stored rectangles, the decision and every trial. The
+  earlier reading writes the `…/v1` record with exactly the earlier content.
+- **Not changed:** the parser, the edge fit and its constants, the homography, `tools/reconstruct_psv_registration.py`
+  and every stored record.
+
+Session 261016, the four trials of the corrected reading:
+
+| Scan object in | Scan points in | Hull against scan object, px |
+|---|---|---|
+| full-frame rectangle | full-frame rectangle (the earlier reading) | 146.0 |
+| full-frame rectangle | default point-list frame | **0.0004** |
+| default point-list frame | full-frame rectangle | 340.6 |
+| default point-list frame | default point-list frame | 194.6 |
+
+The points are in the default point-list frame, (0, 0) to (1.3333, 1); on the 1920 × 1080 frame that is 1440.0 px
+per unit of u, as §23 found. The value follows from the stored frame; it is not written in the code.
+
+### 24.2 The point geometries
+
+All are fixed without any modal quantity.
+
+| Geometry | Role | Window, mm | Gaps left / right / bottom / top, mm | Distance from the primary positions, rms / max mm |
+|---|---|---|---|---|
+| Nominal mapping of §17 (M11 record) | **superseded**; kept for the comparison | 215.4 × 285.2 | 56.4 / 29.2 / 7.0 / 7.8 | 25.7 / 49.3 |
+| **Corrected 261016 positions** | **primary research mapping** | **287.1 × 285.3** | 7.1 / 6.8 / 7.0 / 7.7 | — |
+| Corrected, unattended edge fit | sensitivity | 287.1 × 285.7 | 7.2 / 6.7 / 6.7 / 7.6 | 1.7 / 4.3 |
+| 279.2 mm, same centre as the 261016 window | diagnostic, **assumed offsets** | 279.2 × 279.2 | 11.0 / 10.8 / 10.1 / 10.7 | 3.0 / 5.0 |
+| 279.2 mm, centred on the plate | diagnostic, **assumed offsets** | 279.2 × 279.2 | 10.9 / 10.9 / 10.4 / 10.4 | 3.1 / 5.3 |
+
+- **Primary.** The corrected pixels of the module with the plate corners of the recorded M11 edge fit. The positions
+  equal those of §23 exactly (difference 0.0 mm). They are used for 261027 **on the owner's statement that the same
+  points were scanned**, and are conditional on it.
+- **Unattended.** The corrected module run by itself finds the left, right and top edges as M11 did. At the bottom it
+  takes another structure (19 of 42 samples, tilted 0.96°), the one that M11 deviation 3 replaced. The window height
+  differs by 0.4 mm.
+- **279.2 mm.** The side comes from the 261027 instrument export at the entered distance of 1.15 m (§23.7). The
+  261027 offsets have no instrument record. Two offsets are assumed and both are reported.
+- **The earlier reading on this file** stops with an error (no top edge found): the file stores an anomalous v range
+  in `DefaultSettings`, which M11 had replaced by hand (deviation 1).
+- **Mapping, metric, levels and labels** are those of §17, unchanged: placement D (`CONVENTION_ONLY`), bilinear
+  sampling of FE U3, complex MAC, the 59 declared shift and rotation scenarios as a range.
+
+### 24.3 Baseline: before and after
+
+Research MAC of each record with its first-ranked FE mode. "Range" is over the 59 declared scenarios around the
+corrected positions. Errors are (FE − EXP) / EXP.
+
+| EXP | Hz | Before: first FE, MAC | After: first FE (Hz) | MAC (range) | Frequency error | Second FE, MAC | Share in the pair | Share in FE 8–11 / FE 13–16 | Share in the 14 shapes, before → after | Label after |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 18.63 | FE 7, 0.91 | FE 7 (19.07) | **0.97** (0.96–0.97) | +2.4 % | FE 9, 0.01 | — | 0.01 / 0.00 | 0.97 → 0.99 | CANDIDATE_ONLY |
+| 2 | 54.62 | FE 9, 0.60 | FE 9 (62.01) | 0.52 (0.52–0.52) | +13.5 % | FE 8, 0.45 | 8 / 9: 0.97 | 0.99 / 0.00 | 1.00 → 0.99 | AMBIGUOUS_CLUSTER |
+| 3 | 63.50 | FE 20, 0.31 | FE 8 (59.87) | 0.45 (0.44–0.45) | −5.7 % | FE 11, 0.26 | 8 / 9: 0.70 | 0.96 / 0.00 | 0.84 → 0.96 | NO_CANDIDATE |
+| 4 | 66.85 | FE 11, 0.55 | FE 11 (72.19) | 0.56 (0.55–0.56) | +8.0 % | FE 8, 0.22 | 10 / 11: 0.57 | 0.98 / 0.00 | 0.92 → 0.99 | AMBIGUOUS_CLUSTER |
+| 5 | 74.21 | FE 10, 0.48 | FE 10 (71.85) | **0.99** (0.97–0.99) | −3.2 % | FE 7, 0.00 | 10 / 11: 0.99 | 0.99 / 0.00 | 0.68 → 0.99 | AMBIGUOUS_CLUSTER |
+| 6 | 112.27 | FE 12, 0.52 | FE 12 (116.58) | **0.99** (0.97–0.99) | +3.8 % | FE 9, 0.01 | — | 0.01 / 0.00 | 1.00 → 1.00 | CANDIDATE_ONLY |
+| 7 | 145.94 | FE 14, 0.79 | FE 14 (168.61) | 0.79 (0.77–0.79) | +15.5 % | FE 16, 0.13 | 13 / 14: 0.79 | 0.00 / 0.98 | 0.99 → 0.99 | AMBIGUOUS_CLUSTER |
+| 8 | 157.85 | FE 16, 0.43 | FE 16 (179.90) | 0.43 (0.41–0.45) | +14.0 % | FE 15, 0.37 | 15 / 16: 0.81 | 0.00 / 0.97 | 0.98 → 0.98 | AMBIGUOUS_CLUSTER |
+| 9 | 169.18 | FE 13, 0.26 | FE 13 (167.49) | **0.98** (0.96–0.98) | −1.0 % | FE 18, 0.00 | 13 / 14: 0.98 | 0.00 / 0.98 | 0.48 → 0.99 | AMBIGUOUS_CLUSTER |
+| 10 | 180.14 | FE 15, 0.15 | FE 15 (174.80) | 0.57 (0.55–0.57) | −3.0 % | FE 16, 0.41 | 15 / 16: 0.97 | 0.00 / 0.98 | 0.67 → 1.00 | AMBIGUOUS_CLUSTER |
+| 11 | 191.60 | FE 18, 0.54 | FE 18 (213.95) | **0.96** (0.92–0.96) | +11.7 % | FE 17, 0.01 | 17 / 18: 0.97 | 0.00 / 0.03 | 0.99 → 1.00 | AMBIGUOUS_CLUSTER |
+
+- **Five records agree with one baseline mode at 0.96–0.99:** 1, 5, 6, 9 and 11. Before, only record 1 exceeded 0.80.
+- **The first-ranked mode is the same in all 59 scenarios for every record**, and the MAC moves by at most 0.04.
+- **Record 3 no longer points to FE 20** (416 % away). Its first-ranked mode is now FE 8, inside the pair it belongs
+  to.
+- **Labels.** `AMBIGUOUS_CLUSTER` is given whenever the first-ranked mode belongs to a close FE group or a two-mode
+  subspace reaches 0.80, whatever the MAC. Records 5, 9 and 11 carry it for that reason. No label is a pairing.
+- **Subspaces.** Records 2–5 lie 0.96–0.99 inside the span of the four modes FE 8–11 (0.99, 0.61, 0.76, 0.49
+  before). Records 7–10 lie 0.97–0.98 inside the span of FE 13–16 (0.98, 0.97, 0.26, 0.25 before). The four-mode
+  shares were added after the first tables had been read and are marked post hoc in `protocol.json`.
+
+### 24.4 All 16 models
+
+Research MAC of each record with its first-ranked FE mode, corrected positions.
+
+| Model | EXP 1 | EXP 2 | EXP 3 | EXP 4 | EXP 5 | EXP 6 | EXP 7 | EXP 8 | EXP 9 | EXP 10 | EXP 11 | Mean, before → after | Records ≥ 0.80, before → after |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Baseline | 0.97 | 0.52 | 0.45 | 0.56 | 0.99 | 0.99 | 0.79 | 0.43 | 0.98 | 0.57 | 0.96 | 0.50 → 0.75 | 1 → 5 |
+| G12 −5 % | 0.97 | 0.52 | 0.45 | 0.56 | 0.99 | 0.99 | 0.79 | 0.43 | 0.98 | 0.57 | 0.96 | 0.50 → 0.75 | 1 → 5 |
+| S0 (G12 4 850) | 0.97 | 0.52 | 0.45 | 0.56 | 0.99 | 0.99 | 0.79 | 0.43 | 0.98 | 0.57 | 0.96 | 0.50 → 0.75 | 1 → 5 |
+| G12 +5 % | 0.97 | 0.52 | 0.45 | 0.56 | 0.99 | 0.99 | 0.79 | 0.43 | 0.98 | 0.57 | 0.96 | 0.50 → 0.75 | 1 → 5 |
+| G12 ×2 | 0.97 | 0.52 | 0.45 | 0.56 | 0.99 | 0.99 | 0.79 | 0.43 | 0.98 | 0.56 | 0.96 | 0.51 → 0.75 | 1 → 5 |
+| G12 ×3 | 0.97 | 0.52 | 0.45 | 0.56 | 0.98 | 0.99 | 0.79 | 0.43 | 0.98 | 0.56 | 0.96 | 0.51 → 0.75 | 1 → 5 |
+| E1 −5 % | 0.97 | 0.77 | 0.61 | 0.56 | 0.99 | 0.99 | 0.79 | 0.65 | 0.98 | 0.82 | 0.96 | 0.56 → 0.83 | 2 → 6 |
+| E1 +5 % | 0.97 | 0.76 | 0.48 | 0.56 | 0.99 | 0.99 | 0.79 | 0.65 | 0.98 | 0.75 | 0.96 | 0.55 → 0.81 | 2 → 5 |
+| E2 −5 % | 0.97 | 0.77 | 0.49 | 0.56 | 0.99 | 0.99 | 0.79 | 0.66 | 0.98 | 0.76 | 0.96 | 0.55 → 0.81 | 2 → 5 |
+| E2 +5 % | 0.97 | 0.76 | 0.60 | 0.56 | 0.99 | 0.99 | 0.79 | 0.64 | 0.98 | 0.81 | 0.96 | 0.56 → 0.82 | 2 → 6 |
+| E1 −10 % | 0.97 | 0.87 | 0.66 | 0.56 | 0.99 | 0.99 | 0.79 | 0.73 | 0.98 | 0.90 | 0.96 | 0.58 → 0.85 | 3 → 7 |
+| E2 −10 % | 0.97 | 0.91 | 0.61 | 0.56 | 0.99 | 0.99 | 0.79 | 0.77 | 0.98 | 0.90 | 0.96 | 0.58 → 0.86 | 3 → 7 |
+| H1 (E −22.4 %) | 0.97 | 0.52 | 0.45 | 0.56 | 0.99 | 0.99 | 0.79 | 0.43 | 0.98 | 0.56 | 0.96 | 0.51 → 0.75 | 1 → 5 |
+| H2 (E −25.1 %) | 0.97 | 0.52 | 0.45 | 0.56 | 0.99 | 0.99 | 0.79 | 0.43 | 0.98 | 0.56 | 0.96 | 0.51 → 0.75 | 1 → 5 |
+| Wedge, thick at edge 4 (§18) | 0.97 | 0.54 | 0.39 | 0.57 | 0.99 | 0.98 | 0.96 | 0.74 | 0.98 | 0.75 | 0.94 | 0.52 → 0.80 | 2 → 6 |
+| Field of 20 readings (§19) | 0.97 | 0.72 | 0.49 | 0.53 | 0.97 | 0.99 | 0.96 | 0.58 | 0.98 | 0.59 | 0.87 | 0.52 → 0.79 | 3 → 6 |
+| *Expectation E2 = 41 000 (§22.8; not a solve)* | *0.97* | *0.97* | *0.68* | *0.56* | *0.99* | *0.99* | *0.79* | *0.81* | *0.98* | *0.97* | *0.96* | *0.59 → 0.88* | *3 → 8* |
+
+- **Records 1, 5, 6, 9 and 11 are at 0.87–0.99 in every model.** They do not distinguish the models.
+- **G12 and a common E change no shape.** The eight models with E1 = E2 and uniform thickness give the baseline row.
+- **E1 ≠ E2 raises records 2, 8 and 10.** With E2 −10 %: 0.52 → 0.91, 0.43 → 0.77 and 0.57 → 0.90. Both signs of
+  E1 − E2 separate the pairs and raise these values; the sign is addressed in §24.6.
+- **The thickness models raise record 7** to 0.96 (0.79 in every uniform model), and the wedge raises record 8 to
+  0.74.
+- **Records 3 and 4 stay low in every archived model** (at most 0.66 and 0.57). Record 8 stays below 0.80 in every
+  archived model (at most 0.77).
+- **Best archived value per record:** 0.97, 0.91, 0.66, 0.57, 0.99, 0.99, 0.96, 0.77, 0.98, 0.90, 0.96. They come
+  from different models; no single archived model reaches them together.
+
+### 24.5 The alternative geometries
+
+Research MAC with the first-ranked FE mode, baseline and expectation.
+
+| Geometry | Model | EXP 1 | EXP 2 | EXP 3 | EXP 4 | EXP 5 | EXP 6 | EXP 7 | EXP 8 | EXP 9 | EXP 10 | EXP 11 | Mean |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Nominal of §17 (superseded) | Baseline | 0.91 | 0.60 | 0.31 | 0.55 | 0.48 | 0.52 | 0.79 | 0.43 | 0.26 | 0.15 | 0.54 | 0.50 |
+| **Corrected 261016** | Baseline | 0.97 | 0.52 | 0.45 | 0.56 | 0.99 | 0.99 | 0.79 | 0.43 | 0.98 | 0.57 | 0.96 | 0.75 |
+| Corrected, unattended edge fit | Baseline | 0.97 | 0.52 | 0.45 | 0.55 | 0.98 | 0.99 | 0.79 | 0.43 | 0.98 | 0.57 | 0.95 | 0.74 |
+| 279.2 mm, same centre | Baseline | 0.97 | 0.52 | 0.44 | 0.56 | 0.97 | 0.98 | 0.78 | 0.42 | 0.95 | 0.56 | 0.94 | 0.74 |
+| 279.2 mm, plate centre | Baseline | 0.97 | 0.52 | 0.44 | 0.56 | 0.97 | 0.98 | 0.78 | 0.42 | 0.95 | 0.56 | 0.94 | 0.74 |
+| Nodal-line control of §22.4 (quoted, built from modal shapes) | Baseline | 0.97 | 0.52 | 0.45 | 0.56 | 0.99 | 1.00 | 0.80 | 0.43 | 0.99 | 0.57 | 0.96 | 0.75 |
+| Nominal of §17 (superseded) | *Expectation* | 0.91 | 0.97 | 0.33 | 0.55 | 0.48 | 0.52 | 0.79 | 0.92 | 0.26 | 0.25 | 0.55 | 0.59 |
+| **Corrected 261016** | *Expectation* | 0.97 | 0.97 | 0.68 | 0.56 | 0.99 | 0.99 | 0.79 | 0.81 | 0.98 | 0.97 | 0.96 | 0.88 |
+| 279.2 mm, same centre | *Expectation* | 0.97 | 0.97 | 0.67 | 0.56 | 0.97 | 0.98 | 0.78 | 0.80 | 0.95 | 0.94 | 0.94 | 0.87 |
+| 279.2 mm, plate centre | *Expectation* | 0.97 | 0.97 | 0.67 | 0.56 | 0.97 | 0.98 | 0.78 | 0.80 | 0.95 | 0.94 | 0.94 | 0.87 |
+
+- **The open 3 % of the 261027 window size does not affect any conclusion of this section.** Over the 16 models and
+  the expectation, the 279.2 mm geometries change no first-ranked FE mode. The largest change of a first-ranked MAC
+  is 0.034 (same centre) and 0.033 (plate centre).
+- **The bottom-edge question does not either.** The unattended edge fit changes no first-ranked mode and no
+  first-ranked MAC by more than 0.017.
+- **No geometry is chosen by these numbers.** The primary geometry was fixed by the instrument record and the owner's
+  statement before any of them was computed. The 279.2 mm rows are slightly lower; that is not evidence for or
+  against either size.
+- **The nodal-line control of §22.4 is no longer needed.** The instrument-based positions give the same values to
+  0.01–0.02 without using a mode shape. Where the corrected positions put the experimental nodal lines:
+
+| Record | Class (§22) | FE nodal lines, mm | Corrected positions, mm | Nominal mapping of §17, mm |
+|---|---|---|---|---|
+| 2 | Y, order 1 | 67.2, 232.8 | 67.7, 228.3 | 67.7, 228.4 |
+| 7 | Y, order 2 | 39.6, 150.0, 260.4 | 41.2, 149.1, 256.6 | 41.3, 149.2, 256.7 |
+| 3 | X, order 1 | 67.5, 233.5 | 73.3, 233.3 | 106.2, 226.1 |
+| 9 | X, order 2 | 39.8, 150.5, 261.2 | 42.7, 150.2, 258.8 | 83.2, 163.8, 245.3 |
+
+  The lines of the X records now lie within 5.9 mm of the FE lines, as those of the Y records do (within 4.5 mm).
+  This is a consequence of the correction and was not used to make it.
+
+### 24.6 Frequencies of the first-ranked modes
+
+Signed error of the first-ranked FE mode, corrected positions; research MAC in brackets.
+
+| EXP | Hz | Baseline | H1 (E −22.4 %) | E2 −10 % | Wedge (§18) | Field (§19) | *Expectation E2 = 41 000* |
+|---|---|---|---|---|---|---|---|
+| 1 | 18.63 | FE 7: +2.4 % (0.97) | FE 7: −0.0 % (0.97) | FE 7: +2.3 % (0.97) | FE 7: +2.0 % (0.97) | FE 7: +4.5 % (0.97) | *FE 7: +2.1 % (0.97)* |
+| 2 | 54.62 | FE 9: +13.5 % (0.52) | FE 9: +0.0 % (0.52) | FE 8: +5.6 % (0.91) | FE 8: +8.7 % (0.54) | FE 8: +10.2 % (0.72) | *FE 8: −4.4 % (0.97)* |
+| 3 | 63.50 | FE 8: −5.7 % (0.45) | FE 8: −16.9 % (0.45) | FE 9: −3.9 % (0.61) | FE 9: −3.2 % (0.39) | FE 9: −0.3 % (0.49) | *FE 9: −4.2 % (0.68)* |
+| 4 | 66.85 | FE 11: +8.0 % (0.56) | FE 11: −1.9 % (0.56) | FE 10: +4.0 % (0.56) | FE 11: +7.9 % (0.57) | FE 10: +9.6 % (0.53) | *FE 10: −3.0 % (0.56)* |
+| 5 | 74.21 | FE 10: −3.2 % (0.99) | FE 10: −12.0 % (0.99) | FE 11: −3.2 % (0.99) | FE 10: −3.8 % (0.99) | FE 11: −0.2 % (0.97) | *FE 11: −3.4 % (0.99)* |
+| 6 | 112.27 | FE 12: +3.8 % (0.99) | FE 12: −4.1 % (0.99) | FE 12: +2.3 % (0.99) | FE 12: +3.3 % (0.98) | FE 12: +4.9 % (0.99) | *FE 12: −0.4 % (0.99)* |
+| 7 | 145.94 | FE 14: +15.5 % (0.79) | FE 14: +1.8 % (0.79) | FE 13: +9.6 % (0.79) | FE 13: +12.5 % (0.96) | FE 13: +13.8 % (0.96) | *FE 13: −1.2 % (0.79)* |
+| 8 | 157.85 | FE 16: +14.0 % (0.43) | FE 16: +1.6 % (0.43) | FE 15: +7.0 % (0.77) | FE 16: +14.3 % (0.74) | FE 16: +15.9 % (0.58) | *FE 14: −2.0 % (0.81)* |
+| 9 | 169.18 | FE 13: −1.0 % (0.98) | FE 13: −12.8 % (0.98) | FE 14: −1.0 % (0.98) | FE 14: −1.6 % (0.98) | FE 14: −0.0 % (0.98) | *FE 15: −1.0 % (0.98)* |
+| 10 | 180.14 | FE 15: −3.0 % (0.57) | FE 15: −13.5 % (0.56) | FE 16: −1.5 % (0.90) | FE 15: −3.0 % (0.75) | FE 15: −1.3 % (0.59) | *FE 16: −1.8 % (0.97)* |
+| 11 | 191.60 | FE 18: +11.7 % (0.96) | FE 18: +1.5 % (0.96) | FE 17: +8.1 % (0.96) | FE 18: +11.2 % (0.94) | FE 18: +12.3 % (0.87) | *FE 17: +1.7 % (0.96)* |
+| Mean absolute error, records with MAC ≥ 0.50, before → after | | 9.2 → 6.9 % | 1.5 → 5.3 % | 5.6 → 4.4 % | 9.1 → 6.8 % | 11.1 → 7.3 % | *2.1 → 2.3 %* |
+| Records with MAC ≥ 0.50, before → after | | 6 → 9 | 6 → 9 | 7 → 11 | 5 → 10 | 4 → 10 | *7 → 11* |
+
+- **The direction-dependent pattern is now carried by identified modes.** In the baseline, record 11 (MAC 0.96, a
+  mode governed by curvature along FE Y, §22.6) is 11.7 % too high. Records 5 and 9 (0.99 and 0.98, governed by
+  curvature along FE X) are 3.2 % and 1.0 % too low. Records 1 and 6 (twist, and both directions) are 2.4 % and
+  3.8 % too high. In §22 this pattern rested on the class order alone.
+- **A common lower E is excluded more firmly than before.** With H1 the records 5 and 9 are 12.0 % and 12.8 % too
+  low at MAC 0.99 and 0.98. The earlier mean of 1.5 % for H1 (§20.3) was a mean over the six records that reached
+  0.50 with the old positions, and those were mostly the Y-governed ones.
+- **The thickness models leave the Y-governed records 11–16 % too high** (records 7, 8, 11) while matching the shape
+  of record 7.
+- **The first-ranked modes of §17–§20 that changed:** record 3 in 15 of the 16 models (all but E2 −10 %). Every
+  other first-ranked mode is the one of the earlier tables; what changed is its MAC.
+
+### 24.7 The directional stiffness hypothesis, reassessed
+
+What does not depend on the point positions is unchanged from §22: the whole-plate classes of the FE modes, the
+class frequencies and ratios (§22.5), the class-order table (§22.6), the origin of E2 = 41 000 MPa and the
+falsification criteria (§22.8). What depends on the positions was recomputed.
+
+**The scan window no longer distorts the classes.**
+
+| Shape | Nominal window of §17: X share, Y share, parity | Corrected window: X share, Y share, parity |
+|---|---|---|
+| X, order 1 | 1.00 (2), 0.29, SS 0.88 | 1.00 (2), 0.00, SS 1.00 |
+| X, order 2 | 1.00 (**2**), 0.00, AS 0.84 | 1.00 (3), 0.00, AS 1.00 |
+| 0.8 X1 + 0.6 Y1 | 0.53, 0.61, SS 0.94 | 0.64, 0.36, SS 1.00 |
+| Twist | 0.00, 0.04, AA 0.96 | 0.00, 0.00, AA 1.00 |
+
+- The corrected window is centred on the plate to 0.2 mm along X and 1.1 mm along Y. The descriptor of §21.5 then
+  returns the direction, order and parity of the synthetic shapes exactly, as on the whole plate (§22.3).
+- For the 16 FE models the one-direction class seen in the window equals the whole-plate class for all 224 modes
+  (185 of 224 with the old window).
+- Axis check of §22.2 with the corrected positions: one step of grid index u is +17.79 mm in FE Y, one step of v is
+  −17.86 mm in FE X (−13.40 mm before). The directions are unchanged: curvature along u is curvature along FE Y.
+
+**Research MAC of each record with the FE mode of its class order** (§22.6: the k-th record of a parity class
+against the k-th FE mode of that class; no MAC and no frequency closeness enter the correspondence), before → after:
+
+| Model | EXP 1 | EXP 2 | EXP 3 | EXP 4 | EXP 5 | EXP 6 | EXP 7 | EXP 8 | EXP 9 | EXP 10 | EXP 11 | Mean | First-ranked mode = class-order mode |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Baseline | 0.91 → 0.97 | 0.57 → 0.45 | 0.09 → 0.25 | 0.55 → 0.56 | 0.48 → 0.99 | 0.52 → 0.99 | 0.79 → 0.79 | 0.36 → 0.37 | 0.26 → 0.98 | 0.13 → 0.41 | 0.54 → 0.96 | 0.47 → 0.70 | 7 of 11 |
+| H1 (E −22.4 %) | 0.91 → 0.97 | 0.57 → 0.45 | 0.09 → 0.25 | 0.55 → 0.56 | 0.49 → 0.99 | 0.52 → 0.99 | 0.79 → 0.79 | 0.36 → 0.38 | 0.26 → 0.98 | 0.13 → 0.41 | 0.55 → 0.96 | 0.47 → 0.70 | 7 of 11 |
+| E2 −10 % | 0.91 → 0.97 | 0.94 → 0.91 | 0.28 → 0.61 | 0.55 → 0.56 | 0.48 → 0.99 | 0.52 → 0.99 | 0.79 → 0.79 | 0.86 → 0.77 | 0.26 → 0.98 | 0.24 → 0.90 | 0.54 → 0.96 | 0.58 → 0.86 | 11 of 11 |
+| Wedge (§18) | 0.92 → 0.97 | 0.64 → 0.54 | 0.17 → 0.39 | 0.50 → 0.57 | 0.47 → 0.99 | 0.48 → 0.98 | 0.97 → 0.96 | 0.18 → 0.21 | 0.24 → 0.98 | 0.07 → 0.22 | 0.46 → 0.94 | 0.46 → 0.70 | 9 of 11 |
+| Field (§19) | 0.93 → 0.97 | 0.80 → 0.72 | 0.21 → 0.49 | 0.49 → 0.53 | 0.48 → 0.97 | 0.49 → 0.99 | 0.96 → 0.96 | 0.31 → 0.36 | 0.24 → 0.98 | 0.10 → 0.38 | 0.43 → 0.87 | 0.50 → 0.75 | 9 of 11 |
+| *Expectation E2 = 41 000* | *0.91 → 0.97* | *0.97 → 0.97* | *0.33 → 0.68* | *0.55 → 0.56* | *0.48 → 0.99* | *0.52 → 0.99* | *0.79 → 0.79* | *0.92 → 0.81* | *0.26 → 0.98* | *0.25 → 0.97* | *0.55 → 0.96* | *0.59 → 0.88* | *11 of 11* |
+
+**Supported more strongly than in §22:**
+
+1. **Shapes and class order now agree.** In the three archived models with E2 below E1 (E1 +5 %, E2 −5 %, E2 −10 %)
+   the first-ranked FE mode of every record is the mode of its class order: 11 of 11. In the models with E1 = E2 it
+   is 7 of 11, in the two thickness models 9 of 11, and in the three models with E1 below E2 it is 7 of 11. The
+   class order uses no MAC, and the first rank uses no class.
+2. **The softer direction is seen in the shapes, not only in the frequencies.** With E2 below E1 the Y-governed
+   member of each mixed pair is the lower one, and the records follow that order. With E1 below E2 the pairs
+   separate as well, but in the opposite order, and the class-order MAC falls (mean 0.59 for E1 −10 % against 0.86
+   for E2 −10 %).
+3. **The frequency pattern is carried by modes identified at 0.96–0.99** (§24.6).
+4. **The expectation for E2 = 41 000 MPa improves on every archived model:** mean 0.88, eight records at 0.80 or
+   above, every first-ranked mode within 4.4 % in frequency, and records 2 and 10 at 0.97.
+
+**Not shown, or against it (unchanged from §22.7 unless stated):**
+
+- **No model with the ratio has been solved.** The expectation is a reduced-basis estimate.
+- **The cause is not identified,** and the ratio is not a material value (`NOT_A_MATERIAL_PROPERTY`).
+- **Records 3 and 4 are not explained by a stiffness ratio.** They stay at 0.68 and 0.56 in the expectation. Both
+  lie 0.96 and 0.98 inside the span of FE 8–11: they are mixtures of the SS and AS classes, which a homogeneous
+  orthotropic plate keeps apart.
+- **Record 7 is not explained by a stiffness ratio either** (0.79 in every uniform model). The thickness models
+  bring it to 0.96. A stiffness ratio and a thickness asymmetry along X act on different records; both may be
+  present. That remains a hypothesis.
+- **Record 8 changes its expected value:** 0.92 with the old positions, 0.81 with the corrected ones. The earlier
+  value was a product of the compressed window.
+- **Session 261016** gives another order-1 ratio (0.811 against 0.860), and the residual between the orders
+  (§22.7) is untouched by this section.
+- **The mapping is instrument-based for 261016 only.** For 261027 it rests on the owner's statement.
+  `PHYSICAL_REGISTRATION_NOT_VERIFIED` stands.
+
+**Verdict.** The directional stiffness hypothesis is consistent with the frequencies, the classes and, with the
+corrected positions, the shapes of 8 of the 11 records. A common modulus, G12, and the two thickness models are
+each excluded as the single explanation. The hypothesis is **not confirmed**: nothing has been solved with the
+ratio, records 3, 4 and 7 need something else, and no value is released.
+
+### 24.8 The proposed test, and the recommendation for the next FE step
+
+- **Recommendation: the one test of §22.8, unchanged.** `S4R_0875_BASELINE` with E2 = 41 000 MPa; one
+  eigenfrequency solve and one ODB extraction, each under a separate owner authorisation. The value comes from the
+  experimental frequencies and the plan alone and does not depend on the point positions.
+- **The three falsification criteria of §22.8 stand as written.** They are whole-plate quantities.
+- **The reported expectation changes.** Expected research MAC with the corrected positions, records 1–11: 0.97,
+  0.97, 0.68, 0.56, 0.99, 0.99, 0.79, 0.81, 0.98, 0.97, 0.96. The two lists of §22.8 (old positions and nodal-line
+  control) are superseded. As before, these are reported, not criteria.
+- **What the solve can now show that it could not before.** With the old positions seven records could not be
+  judged by shape. With the corrected positions the solve is expected to give seven records at 0.96–0.99 and to
+  leave 3, 4, 7 and 8 at 0.56–0.81. If the solved shapes of records 2 and 10 stay near the baseline values (0.52,
+  0.57), the reduced basis is wrong about the pair separation, whatever the frequencies do.
+- **Not recommended now.** A model that combines the ratio with the wedge thickness would address record 7. It
+  should wait for the result of the single-parameter test, so that each change can be read by itself.
+
+### 24.9 What is superseded, and what stays open
+
+**Superseded for current research conclusions.** The earlier text and tables are kept as written; each affected
+section now carries a note that points here.
+
+| Section | Superseded | Still valid |
+|---|---|---|
+| §17 | the research MAC table, the labels, the first-ranked modes and the scenario ranges; the reading of the near-square control of §17.5 | the method, the metric, the levels, the placement convention |
+| §18, §19 | every FE / EXP MAC value and the comparison of the models by MAC | the extraction, the thickness field, the FE-to-FE tracking, the frequencies |
+| §20 | the MAC tables; "seven records explained by no model" (§20.5); the mean frequency errors over records with MAC ≥ 0.50 (§20.3) | variant identities, FE-to-FE tracking, the sensitivity of the FE frequencies |
+| §21 | the statement that the low MAC of records 5, 6, 9, 10, 11 is a discrepancy of the FE model (already qualified in §22.9) | every experimental quantity |
+| §22 | the window descriptors of §22.3; the nodal-line control and its MAC table (§22.4); the expected MAC lists of §22.8 | §22.2, §22.5, §22.6, the origin of the test value, the falsification criteria |
+| §23 | "not recomputed" (§23.8) | everything else |
+
+**Open for the owner.**
+
+1. **The governed tool.** `tools/reconstruct_psv_registration.py` still calls the earlier reading, because the
+   SP-02 and SP-13 records and their reproduction tests depend on it and are outside this task. Whether the tool
+   moves to the corrected reading, and whether those two records are re-examined on their own instrument files, is
+   a decision about accepted evidence (§23.8, item 2).
+2. **The nominal mapping file.** `plate_reconstruction_W301xH300.json` is unchanged. This section uses the corrected
+   positions for research; any program function that reads that file still reads the old positions.
+3. **The 261027 window.** Its size (279 or 287 mm) and offsets stay unrecorded. This section shows that the open
+   3 % does not change a conclusion; it does not close the question.
+4. **Authorisation of the E2 = 41 000 MPa solve and extraction.**
+
+### 24.10 Limitations
+
+- `PHYSICAL_REGISTRATION_NOT_VERIFIED`: the 261027 positions are the 261016 positions on the owner's statement;
+  placement D is a convention; D-044 and SPEC §5.2 stand.
+- The corrected reading was run on one real instrument file. Its stream offsets are validated on that file and on
+  synthetic files. The SP-02 and SP-13 files were not opened, so it is not known whether the reading accepts them.
+- The reading supports one axis-parallel rectangular scan object. Every other case is refused, including the case
+  where the file does not decide (§24.1).
+- The bottom plate edge of the 261016 frame still needs M11 deviation 3. The positions are uncertain at 1–3 mm
+  (§23.6); the scenarios of §24.3 cover ± 3 mm and 0.87°.
+- The expectation for E2 = 41 000 MPa is not a solve. Suspension, force sensor and interior thickness remain
+  unmodelled (§20.4).
+- Labels and MAC values are research quantities. No pairing status and no parameter value follows from them.
+
+### 24.11 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `d1da1c00…` and a clean tracked tree before the edit |
+| Source hashes | 30 inputs equal their recorded hashes (instrument file, 261016 export, M11 record, baseline package, results and arrays of §19, §20, §22, §23); all unchanged in size, mtime and SHA-256 after the run |
+| Governed evidence | `docs/auto_id`, `docs/registrations` and `docs/baseline` have no difference to HEAD; SP-13 record `c30b78d8…` and SP-02 record `f42e69a1…` as recorded in §23 |
+| Earlier reading unchanged | on three synthetic instrument files the changed module and the module at `d1da1c0` give byte-identical v1 records and identical points |
+| Corrected reconstruction, 261016 | 287.1 × 285.3 mm with the recorded plate corners, equal to §23 (0.0 mm); 287.1 × 285.7 mm unattended; frame of the points resolved from the file (hull against scan object 0.0004 px, the three other trials 146–341 px) |
+| Coordinate transformations | corrected pixels reproduce a known synthetic grid to 1·10⁻³ px for four frame layouts (wide frame with a 4 : 3 point frame; one frame only; a 4 : 3 camera; a 1280 × 1024 frame with other rectangles) |
+| Defect regression | the earlier reading on a synthetic file returns 0.750 of the true width with unequal side gaps and an unaffected vertical axis; the corrected reading returns the true positions to 0.6 mm |
+| Refusals | 9 tests: no consistent frame, undecidable frame, disagreeing rectangles, unsupported or missing scan object, invalid rectangles, unknown reading |
+| MAC reproduction | with the old positions the recomputed MAC equals §20 (6.7·10⁻¹⁶), §19 (3.3·10⁻¹⁶) and the expectation of §22.8 (0.0); FE-to-FE assignment equals §20 for every tracked branch |
+| Reproducibility | two complete runs give byte-identical `results.json` (`87b8e042…`), `arrays.npz` (`3a7217be…`) and `protocol.json` (`d9b0bf5e…`) |
+| Tests | `tests.test_psv_video_registration` (new): 22 OK. `tests.test_physical_registration`: 24 OK. `tests.test_sp13_physical_registration`: 17 OK (4 skipped). `tests.test_sp02_physical_registration`: 18 OK (6 skipped). `tests.test_plate_physical_review`: 36 OK. `tests.test_plate_registration_readiness`: 18 OK. `tests.test_plate_study`: 30 OK. `tests.test_plate_rc1_owner_clarification`: 12 OK. `research/m11_r65`: 29 OK. The skips are the suites' own (stores not configured) |
+
+Changed in the repository: `src/services/psv_video_registration.py`, `tests/test_psv_video_registration.py` (new)
+and this report.
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_SCAN_NORMALIZATION_FIX_01` (outside git): `run_fix.py`,
+`protocol.json`, `results.json`, `arrays.npz`, `report.py`, `tables.md`, `legacy_equivalence.py`,
+`fig_mac_baseline_before_after.png`, `fig_first_ranked_all_models.png`, `fig_point_geometries.png`,
+`fig_frequency_error_first_ranked.png`.
 
 ## Not changed
 

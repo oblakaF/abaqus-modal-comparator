@@ -15,6 +15,13 @@ file stored at acquisition time:
 The panel edges are fitted in the frame. The physical scale comes from the measured panel
 dimensions (spec, ruler and calipers; no instrument uncertainty recorded). **No modal data and no
 MAC are used anywhere in this module**: the registration is fixed before any pairing is evaluated.
+
+Pixel normalisation (PLATE-0875-SCAN-NORMALIZATION-FIX-01). A PSV file stores video coordinates in more
+than one unit frame. ``NORMALISATION_LEGACY`` reads the scan points in the default full-frame rectangle;
+that is the reading of the v1 records and it is kept unchanged so that they stay reproducible. It
+compresses the grid horizontally when the file stores the points in another frame.
+``NORMALISATION_INSTRUMENT`` takes the frame of the scan points from the stored metadata, verifies it
+against the stored scan object and refuses when the metadata are missing, unsupported or ambiguous.
 """
 
 from __future__ import annotations
@@ -29,6 +36,9 @@ from typing import Mapping, Sequence
 import numpy as np
 
 SCHEMA = "auto-id/psv-physical-registration-reconstruction/v1"
+SCHEMA_INSTRUMENT = "auto-id/psv-physical-registration-reconstruction/v2"
+NORMALISATION_LEGACY = "legacy-default-rectangle"  # v1 records; kept for their reproduction only
+NORMALISATION_INSTRUMENT = "instrument-metadata"
 _END, _FREE = 0xFFFFFFFE, 0xFFFFFFFF
 
 # Edge-fitting method constants (image analysis, not physical thresholds; recorded with every result).
@@ -41,6 +51,9 @@ EDGE_CLIP_SIGMA = 2.5
 EDGE_SAMPLES = 120
 MEASPOINT_RECORD_BYTES = 40
 MEASPOINT_UV_OFFSET = 106  # byte offset of (u, v) float32 of record 0 (validated against the UNV)
+MEASPOINT_FRAME_OFFSET = 21  # full-frame rectangle in the MeasPoints header (cross-checked, never trusted alone)
+FRAME_COPY_TOLERANCE = 1.0e-5  # stored copies of one rectangle (float32) must agree to this
+NORMALISATION_MATCH_TOL_PX = 0.25  # scan-point hull against the stored scan object, in frame pixels
 
 
 class PSVRegistrationError(ValueError):
@@ -140,6 +153,160 @@ def default_rectangle(blob: bytes) -> tuple[float, float, float, float]:
     if not (u1 > u0 and v1 > v0):
         raise PSVRegistrationError("default full-frame rectangle is not a valid rectangle")
     return float(u0), float(v0), float(u1), float(v1)
+
+
+def _rectangle(blob: bytes, offset: int, what: str) -> tuple[float, float, float, float]:
+    if offset < 0 or len(blob) < offset + 16:
+        raise PSVRegistrationError(f"{what}: the stream is too short to hold a rectangle")
+    u0, v0, u1, v1 = (float(x) for x in struct.unpack_from("<4f", blob, offset))
+    if not (all(math.isfinite(x) for x in (u0, v0, u1, v1)) and u1 > u0 and v1 > v0):
+        raise PSVRegistrationError(f"{what}: not a valid rectangle")
+    return u0, v0, u1, v1
+
+
+def measpoints_frame_rectangle(blob: bytes) -> tuple[float, float, float, float]:
+    """Full-frame rectangle (u_min, v_min, u_max, v_max) stored in the MeasPoints header."""
+    return _rectangle(blob, MEASPOINT_FRAME_OFFSET, "MeasPoints frame rectangle")
+
+
+def video_settings_frame_rectangle(blob: bytes) -> tuple[float, float, float, float]:
+    """Full-frame rectangle stored at the end of the video settings."""
+    return _rectangle(blob, len(blob) - 16, "VideoSettings frame rectangle")
+
+
+def default_point_frame(blob: bytes) -> tuple[float, float, float, float] | None:
+    """Frame (0, 0, a, b) that opens the point list of the mesh default settings, or None if it has none.
+
+    Layout after the rectangle: int32 flag at byte 28, int32 list type (8) at 32, int32 count at 36, then
+    (u, v) float32 pairs. The list of a supported file starts (0, 0), (a, 0), (a, b).
+    """
+    if len(blob) < 64:
+        return None
+    kind, count = struct.unpack_from("<2i", blob, 32)
+    if kind != 8 or count < 3:
+        return None
+    (x0, y0), (x1, y1), (x2, y2) = (struct.unpack_from("<2f", blob, 40 + 8 * k) for k in range(3))
+    if (x0, y0) != (0.0, 0.0) or y1 != 0.0 or x1 != x2 or not (math.isfinite(x1) and math.isfinite(y2)):
+        return None
+    if not (x1 > 0.0 and y2 > 0.0):
+        return None
+    return 0.0, 0.0, float(x1), float(y2)
+
+
+def scan_object_rectangle(blob: bytes) -> tuple[float, float, float, float]:
+    """Rectangle of the one rectangular scan object the operator defined; refuses any other content.
+
+    Layout: int32 version, int32 object count, 2 x int32, int32 101, rectangle (4 float32) at byte 20, int32
+    flag at 36, int32 outline type (8) at 40, int32 corner count at 44, corners (u, v float32) from byte 48.
+    """
+    if len(blob) < 80:
+        raise PSVRegistrationError("ScanObjects: the stream is too short to hold a scan object")
+    objects, marker = struct.unpack_from("<i", blob, 4)[0], struct.unpack_from("<i", blob, 16)[0]
+    kind, corners = struct.unpack_from("<2i", blob, 40)
+    if objects != 1 or marker != 101 or kind != 8 or corners != 4:
+        raise PSVRegistrationError(
+            f"ScanObjects: unsupported content (objects {objects}, marker {marker}, outline type {kind}, "
+            f"corners {corners}); only one rectangular scan object is supported")
+    rect = _rectangle(blob, 20, "scan object rectangle")
+    u0, v0, u1, v1 = rect
+    outline = np.array(struct.unpack_from("<8f", blob, 48), dtype=float).reshape(4, 2)
+    expected = np.array([[u0, v0], [u1, v0], [u1, v1], [u0, v1]])
+    if float(np.abs(outline - expected).max()) > FRAME_COPY_TOLERANCE:
+        raise PSVRegistrationError("ScanObjects: the scan object is not an axis-parallel rectangle (unsupported)")
+    return rect
+
+
+def _to_pixels(points: np.ndarray, frame: Sequence[float], size: Sequence[int]) -> np.ndarray:
+    u0, v0, u1, v1 = frame
+    points = np.asarray(points, dtype=float)
+    return np.column_stack([(points[:, 0] - u0) * size[0] / (u1 - u0), (points[:, 1] - v0) * size[1] / (v1 - v0)])
+
+
+def _same_frame(a: Sequence[float], b: Sequence[float]) -> bool:
+    return max(abs(x - y) for x, y in zip(a, b)) <= FRAME_COPY_TOLERANCE
+
+
+@dataclass(frozen=True)
+class PixelNormalisation:
+    """How the stored video coordinates of the scan points map to pixels of the stored frame."""
+
+    points_frame: tuple[float, float, float, float]  # frame of the scan-point (u, v)
+    object_frame: tuple[float, float, float, float]  # frame of the scan object and the alignment points
+    frame_px: tuple[int, int]
+    record: dict  # JSON-serialisable account of the stored metadata and of the decision
+
+    def points_px(self, uv: np.ndarray) -> np.ndarray:
+        return _to_pixels(uv, self.points_frame, self.frame_px)
+
+    def object_px(self, uv: np.ndarray) -> np.ndarray:
+        return _to_pixels(uv, self.object_frame, self.frame_px)
+
+
+def resolve_pixel_normalisation(uv: np.ndarray, frame_px: Sequence[int], *, measpoints: bytes, defaults: bytes,
+                                scan_objects: bytes, video_settings: bytes) -> PixelNormalisation:
+    """Unit frame of the scan-point video coordinates, taken from the stored instrument metadata.
+
+    The file stores frames in which video coordinates can be expressed: the full-frame rectangle (MeasPoints
+    header, VideoSettings and the u range of the default settings must agree) and, when present, the frame that
+    opens the default point list. The scan object the operator drew is the stored reference: under the right
+    pair of frames the hull of the scan points coincides with it in the frame. Exactly one pair of stored
+    frames must do so. Nothing is assumed about the pixel count or the aspect ratio of either frame, no modal
+    quantity is read, and the function refuses instead of choosing when the metadata do not decide.
+    """
+    uv = np.asarray(uv, dtype=float)
+    size = (int(frame_px[0]), int(frame_px[1]))
+    if uv.ndim != 2 or uv.shape[1] != 2 or len(uv) < 4 or min(size) <= 0:
+        raise PSVRegistrationError("pixel normalisation: scan points or frame size not valid")
+    full = measpoints_frame_rectangle(measpoints)
+    full_video = video_settings_frame_rectangle(video_settings)
+    default = default_rectangle(defaults)
+    if not _same_frame(full, full_video):
+        raise PSVRegistrationError("pixel normalisation is ambiguous: the full-frame rectangles of MeasPoints and "
+                                   "VideoSettings differ")
+    if not _same_frame((full[0], full[2]), (default[0], default[2])):
+        raise PSVRegistrationError("pixel normalisation is ambiguous: the default-settings rectangle and the "
+                                   "MeasPoints full-frame rectangle differ in u")
+    point_list = default_point_frame(defaults)
+    frames = {"full-frame rectangle": full}
+    if point_list is not None and not _same_frame(point_list, full):
+        frames["default point-list frame"] = point_list
+    scan_object = scan_object_rectangle(scan_objects)
+    object_corners = np.array([[scan_object[0], scan_object[1]], [scan_object[2], scan_object[3]]])
+    hull = np.array([uv.min(0), uv.max(0)])
+    trials, consistent = [], []
+    for object_name, object_frame in frames.items():
+        for points_name, points_frame in frames.items():
+            mismatch = float(np.abs(_to_pixels(hull, points_frame, size)
+                                    - _to_pixels(object_corners, object_frame, size)).max())
+            trials.append({"scan_object_in": object_name, "scan_points_in": points_name, "hull_mismatch_px": mismatch})
+            if mismatch <= NORMALISATION_MATCH_TOL_PX:
+                consistent.append((object_name, points_name))
+    if not consistent:
+        raise PSVRegistrationError(
+            "pixel normalisation is not supported: under no stored frame does the scan-point hull coincide with "
+            "the stored scan object (" + "; ".join(
+                f"object in {t['scan_object_in']}, points in {t['scan_points_in']}: {t['hull_mismatch_px']:.2f} px"
+                for t in trials) + ")")
+    if len(consistent) > 1:
+        raise PSVRegistrationError("pixel normalisation is ambiguous: more than one pair of stored frames is "
+                                   f"consistent with the scan object ({consistent})")
+    object_name, points_name = consistent[0]
+    record = {
+        "mode": NORMALISATION_INSTRUMENT,
+        "full_frame_rectangle": list(full),
+        "default_settings_rectangle": list(default),
+        "default_point_list_frame": None if point_list is None else list(point_list),
+        "scan_object_rectangle": list(scan_object),
+        "scan_points_hull_uv": hull.tolist(),
+        "frame_px": list(size),
+        "scan_points_frame": {"name": points_name, "rectangle": list(frames[points_name])},
+        "scan_object_frame": {"name": object_name, "rectangle": list(frames[object_name])},
+        "px_per_u": size[0] / (frames[points_name][2] - frames[points_name][0]),
+        "px_per_v": size[1] / (frames[points_name][3] - frames[points_name][1]),
+        "match_tolerance_px": NORMALISATION_MATCH_TOL_PX,
+        "trials": trials,
+    }
+    return PixelNormalisation(tuple(frames[points_name]), tuple(frames[object_name]), size, record)
 
 
 def alignment_points(blob: bytes) -> np.ndarray:
@@ -259,12 +426,20 @@ class Reconstruction:
 
 
 def reconstruct(svd_bytes: bytes, unv_xy_m: np.ndarray, unv_node_ids: Sequence[int], panel_width_mm: float,
-                panel_height_mm: float, *, sources: Mapping[str, object]) -> Reconstruction:
+                panel_height_mm: float, *, sources: Mapping[str, object],
+                normalisation: str = NORMALISATION_LEGACY) -> Reconstruction:
     """Reconstruct the physical scan-point positions on the panel from the stored PSV frame.
 
     Frame convention: origin at the panel's bottom-left corner as seen by the scanner (the measured,
     labelled face), +x to the right in the camera image, +y towards the labelled top edge.
+
+    ``normalisation`` selects how the stored video coordinates become pixels. The default is the v1 reading,
+    kept so that the v1 records are reproduced unchanged; it is wrong for a file that stores the scan points
+    in another frame than the default rectangle. ``NORMALISATION_INSTRUMENT`` resolves the frame from the
+    stored metadata (:func:`resolve_pixel_normalisation`) and writes a v2 record.
     """
+    if normalisation not in (NORMALISATION_LEGACY, NORMALISATION_INSTRUMENT):
+        raise PSVRegistrationError(f"unknown pixel normalisation {normalisation!r}")
     cf = CompoundFile(svd_bytes)
     count = len(unv_node_ids)
     meas = cf.read("Info/Geometry/MeasPoints")
@@ -277,21 +452,36 @@ def reconstruct(svd_bytes: bytes, unv_xy_m: np.ndarray, unv_node_ids: Sequence[i
     if float(np.max(scan_residual)) > 2.0e-3:
         raise PSVRegistrationError("MeasPoints do not validate against the UNV geometry (point order / layout)")
 
-    # 2. pixel normalisation from the stored default full-frame rectangle
+    # 2. pixel normalisation: the v1 reading (default full-frame rectangle) or the stored instrument metadata
     defaults = cf.read("Info/APS_Mixed/MeshObject1/DefaultSettings")
-    u0, v0, u1, v1 = default_rectangle(defaults)
     frame_blob = cf.read("Info/VideoBitmap")
     image = video_frame(frame_blob)
     width, height = image.size
-    px_per_u, px_per_v = width / (u1 - u0), height / (v1 - v0)
-    px = np.column_stack([(uv[:, 0] - u0) * px_per_u, (uv[:, 1] - v0) * px_per_v])
     alignment_blob = cf.read("Info/VideoSettings")
     align = alignment_points(alignment_blob)
     tangent = np.tan(np.radians(align[:, :2]))
     design = np.column_stack([np.ones(len(align)), tangent])
-    cu, *_ = np.linalg.lstsq(design, align[:, 2], rcond=None)
-    cv, *_ = np.linalg.lstsq(design, align[:, 3], rcond=None)
-    angle_isotropy = abs(cu[1]) / abs(cv[2])
+    streams = ["Info/Geometry/MeasPoints", "Info/VideoBitmap", "Info/VideoSettings",
+               "Info/APS_Mixed/MeshObject1/DefaultSettings"]
+    if normalisation == NORMALISATION_LEGACY:
+        u0, v0, u1, v1 = default_rectangle(defaults)
+        px_per_u, px_per_v = width / (u1 - u0), height / (v1 - v0)
+        px = np.column_stack([(uv[:, 0] - u0) * px_per_u, (uv[:, 1] - v0) * px_per_v])
+        cu, *_ = np.linalg.lstsq(design, align[:, 2], rcond=None)
+        cv, *_ = np.linalg.lstsq(design, align[:, 3], rcond=None)
+        pixel_record = {"default_rectangle_u": [u0, u1], "default_rectangle_v": [v0, v1],
+                        "frame_px": [width, height], "px_per_u": px_per_u, "px_per_v": px_per_v,
+                        "scanner_angle_isotropy_du_dv": float(abs(cu[1]) / abs(cv[2]))}
+    else:
+        streams.append("Info/APS_Mixed/MeshObject1/ScanObjects")
+        resolved = resolve_pixel_normalisation(uv, (width, height), measpoints=meas, defaults=defaults,
+                                               scan_objects=cf.read(streams[-1]), video_settings=alignment_blob)
+        px = resolved.points_px(uv)
+        align_px = resolved.object_px(align[:, 2:4])  # the alignment points share the frame of the scan object
+        cu, *_ = np.linalg.lstsq(design, align_px[:, 0], rcond=None)
+        cv, *_ = np.linalg.lstsq(design, align_px[:, 1], rcond=None)
+        pixel_record = dict(resolved.record)
+        pixel_record["scanner_angle_isotropy_dpx_x_over_dpx_y"] = float(abs(cu[1]) / abs(cv[2]))
 
     # 3. panel edges in the stored frame; physical panel frame through the four corners
     gray = np.asarray(image.convert("L"), dtype=float)
@@ -346,11 +536,9 @@ def reconstruct(svd_bytes: bytes, unv_xy_m: np.ndarray, unv_node_ids: Sequence[i
                 "max": float(values.max())}
 
     record = {
-        "schema": SCHEMA,
+        "schema": SCHEMA if normalisation == NORMALISATION_LEGACY else SCHEMA_INSTRUMENT,
         "sources": dict(sources),
-        "stream_sha256": {name: sha256(cf.read(name)) for name in (
-            "Info/Geometry/MeasPoints", "Info/VideoBitmap", "Info/VideoSettings",
-            "Info/APS_Mixed/MeshObject1/DefaultSettings")},
+        "stream_sha256": {name: sha256(cf.read(name)) for name in streams},
         "method_constants": {
             "measpoint_record_bytes": MEASPOINT_RECORD_BYTES, "measpoint_uv_offset": MEASPOINT_UV_OFFSET,
             "edge_search_window_px": EDGE_SEARCH_WINDOW_PX, "edge_min_step": EDGE_MIN_STEP,
@@ -359,9 +547,7 @@ def reconstruct(svd_bytes: bytes, unv_xy_m: np.ndarray, unv_node_ids: Sequence[i
             "edge_samples": EDGE_SAMPLES},
         "parser_validation": {"point_count": count, "order": "MeasPoints record k <-> UNV node k (as listed)",
                               "uv_from_unv_homography_residual": stats(scan_residual)},
-        "pixel_normalisation": {"default_rectangle_u": [u0, u1], "default_rectangle_v": [v0, v1],
-                                "frame_px": [width, height], "px_per_u": px_per_u, "px_per_v": px_per_v,
-                                "scanner_angle_isotropy_du_dv": float(angle_isotropy)},
+        "pixel_normalisation": pixel_record,
         "panel_edges_px": lines,
         "panel_corners_px": {k: v.tolist() for k, v in corners.items()},
         "panel_size_px": [float(width_px), float(height_px)],
