@@ -1,10 +1,10 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No LM, parameter fit
 or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in two sections: one ODB
-extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction (§19). §1–§17, §20
-and §21 ran no Abaqus; §21 reads experimental files only, the others read existing FE results.
+extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction (§19). §1–§17 and
+§20–§22 ran no Abaqus; §21 reads experimental files only, the others read existing FE results.
 
 - **Scope (owner).** The sandwich panels are set aside. One specimen is studied: `PLATE-300x300x1mm`, series
   `NEXP29/PLATE300-1MM/S261027-ROTATED`.
@@ -1807,8 +1807,10 @@ unchanged.
   - records 5, 6, 9, 10 and 11 are supported by the response data without a limitation of the shape;
   - record 3 is supported, with a low coherence at its peak (0.88);
   - record 4 has weak support: a 4 dB shoulder beside record 3, with the highest damping of the low records.
-- **So the FE discrepancy of records 5, 6, 9, 10 and 11 is not an artefact of the modal fit.** Its cause lies in the
-  FE model or in the FE-to-scan mapping. This section does not say which.
+- **So the response data give no indication that the FE discrepancy of records 5, 6, 9, 10 and 11 is an artefact of
+  the modal fit. They do not exclude it** (amended by §22.9: response support and a refit with fixed poles do not
+  validate the poles). The other candidate causes are the FE model and the FE-to-scan mapping; §22.4 points to the
+  mapping.
 - **A pattern that the earlier sections did not use.** Four records are bending in one grid direction only: records 2
   and 7 along one grid index, records 3 and 9 along the other. The second group lies 16 % higher in frequency, in
   both orders. This is a hypothesis about a direction-dependent bending stiffness (§21.5); it is not a material value.
@@ -1954,7 +1956,8 @@ The descriptors use the grid's own two indices, called u and v here. They refer 
 **Verified** (computed from the stored data; reproducible):
 
 1. The auxiliary file holds H1 mobilities with coherence for the same 289 points (§21.1).
-2. The fitted shapes are the residues of that response at the stored poles (refit MAC ≥ 0.998).
+2. The fitted shapes are the residues of that response at the stored poles (refit MAC ≥ 0.998). This does not
+   validate the poles themselves (§22.9).
 3. Ten records have a peak of 10 dB or more within one line; record 4 has 4 dB, one line away.
 4. The response shape at the peak equals the fitted shape for nine records (0.98–1.00); 0.93 for record 1 and 0.90
    for record 4.
@@ -1969,7 +1972,7 @@ The descriptors use the grid's own two indices, called u and v here. They refer 
 
 | Record | Experimental support | What the FE discrepancy can therefore be |
 |---|---|---|
-| 5, 6, 10, 11 | supported; clean phase (MPC 0.98–1.00); 5, 6 and 10 recur in 261016 | not an artefact of the fit: FE model or mapping (unexplained) |
+| 5, 6, 10, 11 | supported; clean phase (MPC 0.98–1.00); 5, 6 and 10 recur in 261016 | no indication of a fit artefact, which is not excluded (§22.9); FE model or mapping (§22.4) |
 | 9 | supported; MPC 0.99; pure one-direction pattern; no 261016 counterpart | the same; see hypothesis H4 |
 | 3 | supported, with low coherence at a very narrow peak; shares two parity classes with record 4 | possibly a mixed mode (H1); otherwise as above |
 | 4 | weak: a 4 dB shoulder, ζ 0.92 %, window shape dominated by record 3 | possibly a mixed mode or a measurement limitation (H1) |
@@ -2040,6 +2043,375 @@ The descriptors use the grid's own two indices, called u and v here. They refer 
 `fig_response_support.png`, `fig_shapes.png`.
 
 Nothing is published in the repository except this section.
+
+## 22. PLATE-0875-DIRECTIONAL-STIFFNESS-01 — the directional bending stiffness hypothesis against the existing FE results (2026-11-25)
+
+**Every number in this section is `RESEARCH_ONLY` and `PHYSICAL_REGISTRATION_NOT_VERIFIED`.** No Abaqus solve and no
+ODB extraction was run: only the 16 existing FE packages and the fitted 261027 records were read. Nothing was fitted.
+No orientation, mapping or material value is selected by MAC or by frequency. No pairing is confirmed and no material
+property is released. "X" and "Y" are **directions of the FE model** under placement D (`CONVENTION_ONLY`); E1 and E2
+are effective bending quantities of a homogeneous shell, not verified fibre directions and not laminate constants. No
+FrozenRegistration was created. M8 GATE NOT_MET, D-077 `NO_GLOBAL_PARAMETER_VALUE` and production Auto-ID BLOCKED are
+unchanged.
+
+**Short answer.**
+
+- **The frequency pattern of all 11 records agrees with one direction-dependent bending stiffness.** In the baseline,
+  the FE modes governed by curvature along FE Y are 8–16 % too high, the modes governed by curvature along FE X are
+  0–3 % too low, and the two modes governed by neither are 2–4 % too high.
+- **Neither the plan nor the thickness can produce it.** 301 × 300 mm gives 0.7 %, in the opposite direction. The two
+  thickness models give 1.4–1.8 %. The experiment shows 16 %.
+- **A ratio of 1.37 between the two bending stiffnesses is what the experimental frequencies imply.** A reduced-basis
+  expectation for E1 = 56 000, E2 = 41 000 MPa (not a solve) puts every record within 4.4 % of the FE mode of its
+  class, and gives the experimental order of the classes, which none of the 16 archived models does.
+- **The cause is not identified.** A laminate has different bending stiffnesses in two directions even when its
+  in-plane moduli are equal; an initial curvature or the suspension would act similarly. This is not a material value.
+- **A second finding, about the mapping, not about the stiffness.** The nodal lines of records 3 and 9 do not fit the
+  nominal scan window along FE X (215 mm). They fit a grid that covers about 294 mm, as along Y. With such a grid
+  (a control, not adopted) four of the seven "unexplained" records reach a research MAC of 0.96–1.00 with the
+  unchanged baseline, and a fifth reaches 0.92 once E1 ≠ E2. The owner has to decide how this conflict with the 261016 reconstruction is resolved (§22.4).
+- **The conclusion of §21 is qualified** (§22.9): response support and a refit with fixed poles do not validate the
+  poles and do not exclude modal-fit errors.
+
+### 22.1 Inputs and method
+
+| Input | Content | SHA-256 |
+|---|---|---|
+| Experiment 261027 | `…ROTATED_Polytec_261027.unv`, set `Polymax_bravo`, 11 records, 289 points | `76db80ae…` = recorded |
+| FE, 16 models | baseline; the 13 material variants of §20.1; the wedge thick at edge 4 (§18); the 20-reading field (§19) | INP, ODB or manifest and extraction files = recorded (§18–§20) |
+| Nominal geometry | `plate_reconstruction_W301xH300.json` (261016, diagnostic) | `09be8b88…` = recorded |
+| Earlier results | §18 `1fd0965e…`, §19 `61947357…`, §20 `35189ace…`, §21 `5d93fa1e…` | = recorded |
+
+- **Descriptor.** The function of §21.5 (`run_mode_quality.grid_pattern`), imported and unchanged: the share of a
+  shape's energy that varies along one grid index only, the sign changes of that mean profile, and the parity shares
+  about the two centre lines.
+- **Two coverages for FE.** *Window*: FE U3 sampled at the 289 nominal points (mapping of §17) on the 17 × 17 grid.
+  *Whole plate*: FE U3 on its own 101 × 101 node grid, which needs no assumption about the scan.
+- **Classes.** One-direction bending: share ≥ 0.70 along one axis with two (order 1) or three (order 2) sign changes
+  on the whole plate. Parity class: the largest of SS / AS / SA / AA; the first letter refers to FE X.
+- **Protocol.** `protocol.json` was written before the first run. Three parts were added after the first results and
+  are marked post hoc in `protocol_addendum.json`: the nodal-line check with its control geometry (§22.4), the
+  reduced-basis expectation (§22.8) and the class-order table (§22.6).
+
+### 22.2 Axis convention
+
+A least-squares affine map from the grid indices of §21 to the nominal positions of the same point ids, which under
+placement D are FE coordinates:
+
+| Grid index of §21 | One step in FE X, Y (mm) | Runs along | §16 |
+|---|---|---|---|
+| u | −0.02, +17.80 | FE +Y | grid +u → FE +Y: equal |
+| v | −13.40, −0.03 | FE −X | grid +v → FE −X: equal |
+
+- Residual of the map: rms 0.31 mm, max 0.65 mm. Point ids fall by 1 per step along u and by 17 per step along v.
+- **"Varies along u" in §21.5 therefore means curvature along FE Y**, the direction from edge 3 to edge 1 (the
+  300 mm sides). "Varies along v" means curvature along FE X (the 301 mm sides).
+- This is a check of a convention against the records of §16. It is not a physical registration.
+- With these axes the experimental descriptors of §21.5 are reproduced exactly (difference 0.0).
+
+### 22.3 The descriptor on synthetic directional shapes
+
+Free-free beam functions on the whole plate grid and at the nominal points. Sign changes in brackets.
+
+| Shape | Whole plate: X share, Y share, parity | Nominal window: X share, Y share, parity |
+|---|---|---|
+| X, order 1 | 1.00 (2), 0.00, SS 1.00 | 1.00 (2), 0.29, SS 0.88 |
+| Y, order 1 | 0.00, 1.00 (2), SS 1.00 | 0.00, 1.00 (2), SS 1.00 |
+| X, order 2 | 1.00 (3), 0.00, AS 1.00 | 1.00 (**2**), 0.00, AS **0.84** |
+| Y, order 2 | 0.00, 1.00 (3), SA 1.00 | 0.00, 1.00 (3), SA 1.00 |
+| 0.8 X1 + 0.6 Y1 | 0.64 (2), 0.36 (2), SS 1.00 | 0.53 (2), 0.61 (2), SS 0.94 |
+| X1 + Y1 | 0.50, 0.50, SS 1.00 | 0.39, 0.72, SS 0.95 |
+| Twist | 0.00, 0.00, AA 1.00 | 0.00, 0.04, AA 0.96 |
+
+- **On the whole plate the descriptor returns the direction, the order and the parity exactly**, and the shares of a
+  mixture are the squares of its coefficients. Exchanging the axes exchanges the outputs.
+- **The nominal window changes the result along X only.** It covers X = 56.4–271.8 mm of 301 mm, 13.7 mm off centre,
+  and Y = 7.0–292.2 mm of 300 mm. An order-2 shape along X then shows two sign changes instead of three, and a parity
+  purity of 0.84. A constant offset inside the window is counted as "Y share" (0.29 for X1), so window shares do not
+  add to one.
+- **Consequence.** Classes are taken from the whole plate for FE. Window values are reported beside them.
+
+### 22.4 Scan coverage: what the nodal lines say
+
+Zero crossings of the mean profiles of the four one-direction records, in grid steps (0 … 16), against the nodal
+lines of the FE modes of the same class on the whole plate (order 2 from the baseline; order 1 from the mean of the
+E1 −10 % and E2 −10 % variants, where the classes are separated).
+
+| Record | Class | Nodal lines, grid steps | As a fraction of the grid | FE nodal lines, fraction of the side | Implied grid step, mm | Where the nominal mapping puts these lines, mm | FE nodal lines, mm |
+|---|---|---|---|---|---|---|---|
+| 2 | Y, order 1 | 3.45, 12.48 | 0.216, 0.780 | 0.224, 0.776 | 18.3 | 68.5, 229.4 | 67.2, 232.8 |
+| 7 | Y, order 2 | 1.96, 8.02, 14.07 | 0.123, 0.502, 0.879 | 0.132, 0.500, 0.868 | 18.2 | 42.0, 150.0, 257.8 | 39.6, 150.0, 260.4 |
+| 3 | X, order 1 | 3.65, 12.61 | 0.228, 0.788 | 0.224, 0.776 | 18.6 | **105.6, 226.1** | 67.5, 233.5 |
+| 9 | X, order 2 | 1.94, 7.96, 14.04 | 0.121, 0.497, 0.877 | 0.132, 0.500, 0.868 | 18.3 | **82.5, 163.5, 245.4** | 39.8, 150.5, 261.2 |
+
+| Direction | Fitted from the five nodal lines | Nominal mapping (261016 reconstruction) |
+|---|---|---|
+| FE X | step 18.39 mm; X = 2.7–296.9 mm (294.2 mm); residual rms 1.5 mm | step 13.46 mm; X = 56.4–271.8 mm (215.4 mm) |
+| FE Y | step 18.27 mm; Y = 3.9–296.3 mm (292.4 mm); residual rms 0.6 mm | step 17.82 mm; Y = 7.0–292.2 mm (285.2 mm) |
+
+- **Verified.** In grid steps the nodal lines of the X records and of the Y records lie at the same places. Along Y
+  the nominal mapping agrees with them (within 3.4 mm). Along X it does not: it would put the three nodal lines of
+  record 9 at 82, 164 and 245 mm, 81 mm apart, where a free bending shape of the 301 mm side has them 111 mm apart.
+- **Hypothesis, not adopted.** If records 3 and 9 are free bending of the whole 301 mm side, the 261027 grid covers
+  about 294 mm along X, not 215 mm. If the nominal window is right, records 3 and 9 are not such modes, and the
+  premise of the directional hypothesis fails for that direction. The data of this section cannot decide between
+  the two by themselves; the next two points bear on it.
+- **Session 261016, supplementary.** The same computation gives 17.7 and 17.8 mm per step along Y (#2, #7), equal
+  to the reconstruction, and 18.8 mm along X (#3), against 13.46 mm. The one X record of 261016 disagrees with the
+  reconstruction in the same way.
+- **Control geometry `NODAL_LINE_GRID`.** The 289 points on the fitted axis-parallel grid; all inside the plate
+  (nearest edge 2.7 mm); 28.5 mm rms and 55.2 mm maximum from the nominal positions. It was fixed from the nodal lines
+  before any MAC with it was computed. It is a control like `UNV_REPRESENTATION_CONTROL` of §17.5: **not a
+  registration, not adopted, and not selected by MAC or frequency.** Records 2, 3, 7 and 9 enter its construction;
+  records 1, 4, 5, 6, 8, 10 and 11 do not.
+
+Research MAC of each record with its first-ranked FE mode, nominal mapping → control geometry:
+
+| Model | EXP 1 | EXP 2 | EXP 3 | EXP 4 | EXP 5 | EXP 6 | EXP 7 | EXP 8 | EXP 9 | EXP 10 | EXP 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Baseline, nominal (§17.3) | 0.91 | 0.60 | 0.31 | 0.55 | 0.48 | 0.52 | 0.79 | 0.43 | 0.26 | 0.15 | 0.54 |
+| Baseline, control | 0.97 | 0.52 | 0.45 | 0.56 | **0.99** | **1.00** | 0.80 | 0.43 | **0.99** | 0.57 | **0.96** |
+| E2 −10 %, control | 0.97 | 0.92 | 0.62 | 0.56 | 0.99 | 1.00 | 0.80 | 0.76 | 0.99 | **0.92** | 0.96 |
+| Wedge (§18), control | 0.97 | 0.54 | 0.40 | 0.57 | 0.99 | 0.99 | 0.97 | 0.74 | 0.99 | 0.77 | 0.95 |
+| Field (§19), control | 0.97 | 0.72 | 0.50 | 0.52 | 0.98 | 0.99 | 0.96 | 0.57 | 0.99 | 0.61 | 0.88 |
+| Share in the span of the 14 baseline shapes, nominal | 0.97 | 1.00 | 0.84 | 0.92 | 0.68 | 1.00 | 0.99 | 0.98 | 0.48 | 0.67 | 0.99 |
+| The same, control | 0.99 | 1.00 | 0.97 | 0.99 | 1.00 | 1.00 | 1.00 | 0.98 | 1.00 | 1.00 | 1.00 |
+
+- **Records 5, 6 and 11 were not used to build the control**, and with it they agree with the unchanged baseline at
+  0.99, 1.00 and 0.96 (0.48, 0.52 and 0.54 with the nominal mapping). Record 10 reaches 0.92 once E1 ≠ E2 separates
+  the pair FE 15 / 16. Every record then lies 0.97–1.00 inside the span of the 14 FE shapes.
+- **This agrees with §17.5**, where the near-square control raised records 5, 6, 9, 10 and 11 and lowered the others:
+  that control was fitted to the nominal points, so it was too narrow along Y and still too narrow along X.
+- **What it means for §20.5 item 3 and §21.** The seven records "explained by no model" are the records that vary
+  along FE X. Their low MAC is at least in large part a property of the nominal X window, not of the FE model and not
+  of the modal fit. This is a strong indication, not a registration: a higher MAC is not evidence for a geometry,
+  and the M11 reconstruction rests on a camera frame and on the scanner angles (§16.3), which this section did not
+  re-examine.
+- **Open, for the owner.** The 261027 scan window has no instrument record (§16.4). The two sources now disagree by
+  about 80 mm along X. Nothing is changed here: the nominal mapping stays the nominal mapping.
+
+### 22.5 Directional bending comparison
+
+Frequencies (Hz) of the FE modes of the four one-direction classes on the whole plate. "Pair" means that the two
+modes FE 8 / 9 are mixtures and the class is not separated in that model.
+
+| Model | Y1 | X1 | Y2 | X2 | Y1 / X1 | Y2 / X2 |
+|---|---|---|---|---|---|---|
+| **Experiment** (records 2, 3, 7, 9) | 54.62 | 63.50 | 145.94 | 169.18 | **0.860** | **0.863** |
+| Baseline | pair 59.87 / 62.01 | pair | 168.61 | 167.49 | — | 1.007 |
+| G12 −5 %, S0, +5 %, ×2, ×3 | as baseline (≤ 0.02 Hz) | pair | 168.61–168.63 | 167.49–167.51 | — | 1.007 |
+| E1 −5 % | 61.61 | 58.74 | 168.62 | 163.26 | 1.049 | 1.033 |
+| E1 +5 % | 60.52 | 62.86 | 168.60 | 171.62 | 0.963 | 0.982 |
+| E2 −5 % | 59.01 | 61.33 | 164.34 | 167.48 | 0.962 | 0.981 |
+| E2 +5 % | 63.15 | 60.25 | 172.77 | 167.50 | 1.048 | 1.032 |
+| E1 −10 % | 61.45 | 57.32 | 168.62 | 158.92 | 1.072 | 1.061 |
+| E2 −10 % | 57.70 | 61.04 | 159.95 | 167.48 | 0.945 | 0.955 |
+| H1 (E −22.4 %) | pair 52.75 / 54.63 | pair | 148.56 | 147.58 | — | 1.007 |
+| H2 (E −25.1 %) | pair 51.83 / 53.67 | pair | 145.95 | 144.99 | — | 1.007 |
+| Wedge, thick at edge 4 (§18) | pair 59.39 / 61.44 | pair | 164.12 | 166.42 | — | 0.986 |
+| Field of 20 readings (§19, assumed) | pair 60.19 / 63.33 | pair | 166.13 | 169.16 | — | 0.982 |
+| *Expectation of the proposed test (§22.8)* | *52.23* | *60.81* | *144.25* | *167.45* | *0.859* | *0.861* |
+
+- **Nodal lines and parity.** On the whole plate every FE one-direction mode has two (order 1) or three (order 2)
+  nodal lines and a pure parity (SS for order 1; SA for Y2, AS for X2), as records 2, 7 and 9 have on their grid
+  (0.98, 0.80, 0.99). Record 3 has the nodal lines of X1 and a parity of SS 0.72 with AS 0.27 (§22.7).
+- **Unequal sides.** With E1 = E2 the model gives Y2 / X2 = 1.007: the shorter side is the stiffer in frequency. The
+  experiment has the opposite sign and about 20 times the size.
+- **Thickness asymmetry.** The two thickness models give 0.986 and 0.982. They also leave the order-1 pair mixed.
+- **G12 and a common E** do not change the ratio at all (1.007 in eight models).
+- **E1 ≠ E2 does, and by the square root of the ratio:** 0.955 = 1.007 × √0.9 at E2 −10 %. The experimental 0.863
+  and 0.860 correspond to E2 / E1 = 0.73, far beyond the ±10 % of the archive.
+- **Inside one direction.** Order 2 over order 1 is 2.67 in the experiment in both directions and 2.73–2.79 in the FE
+  variants with separated classes. This 3 % is common to both directions and is not explained by a stiffness ratio.
+- **The other assignment.** If the two experimental directions were exchanged against FE X and Y, every ratio above
+  would be inverted and the conclusion would be the same with E1 and E2 exchanged. The assignment used here is the one
+  of §22.2. It is not chosen by frequency or MAC.
+
+### 22.6 All 11 records by class
+
+Class-order correspondence: the k-th record of a parity class against the k-th FE mode of that class in ascending
+frequency. It uses no MAC and no frequency closeness, and it is **not a pairing**. "Governing curvature" is the
+share of the bending energy of the FE mode in curvature along X, along Y and in twist (from the separated modes of
+the reduced basis of §22.8). Errors are (FE − EXP) / EXP.
+
+| Record | Hz | Parity (share) | Governing curvature of the FE class mode | Baseline | H1 (E −22 %) | E2 −10 % | Wedge | Field | *Expectation (§22.8)* |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 18.63 | AA (0.99) | twist 0.97 | FE 7: +2.4 % | −0.0 % | +2.3 % | +2.0 % | +4.5 % | *+2.1 %* |
+| 2 | 54.62 | SS (0.98) | **Y** 0.99 (Y1) | FE 8 of the pair: +9.6 % | −3.4 % | +5.6 % | +8.7 % | +10.2 % | *−4.4 %* |
+| 3 | 63.50 | SS (0.72) | **X** 0.99 (X1) | FE 9 of the pair: −2.3 % | −14.0 % | −3.9 % | −3.2 % | −0.3 % | *−4.2 %* |
+| 4 | 66.85 | AS (0.57) | **Y** 0.65, twist 0.33 | FE 11: +8.0 % | −1.9 % | +4.0 % | +7.9 % | +9.6 % | *−3.0 %* |
+| 5 | 74.21 | SA (0.99) | **X** 0.72, twist 0.27 | FE 10: −3.2 % | −12.0 % | −3.2 % | −3.8 % | −0.2 % | *−3.4 %* |
+| 6 | 112.27 | SS (1.00) | X 0.31, Y 0.23, twist 0.46 | FE 12: +3.8 % | −4.1 % | +2.3 % | +3.3 % | +4.9 % | *−0.4 %* |
+| 7 | 145.94 | SA (0.80) | **Y** 1.00 (Y2) | FE 14: +15.5 % | +1.8 % | +9.6 % | +12.5 % | +13.8 % | *−1.2 %* |
+| 8 | 157.85 | AA (0.82) | **Y** 0.86 | FE 15: +10.7 % | −1.3 % | +7.0 % | +10.7 % | +12.6 % | *−2.0 %* |
+| 9 | 169.18 | AS (0.99) | **X** 1.00 (X2) | FE 13: −1.0 % | −12.8 % | −1.0 % | −1.6 % | −0.0 % | *−1.0 %* |
+| 10 | 180.14 | AA (0.98) | **X** 0.89 | FE 16: −0.1 % | −11.0 % | −1.5 % | +0.2 % | +1.6 % | *−1.8 %* |
+| 11 | 191.60 | SA (0.97) | **Y** 0.55, twist 0.33 | FE 18: +11.7 % | +1.5 % | +8.1 % | +11.2 % | +12.3 % | *+1.7 %* |
+| Mean / largest absolute error | | | | 6.2 / 15.5 % | 5.8 / 14.0 % | 4.4 / 9.6 % | 5.9 / 12.5 % | 6.4 / 13.8 % | *2.3 / 4.4 %* |
+| Class sequence of the first 11 FE modes equals the experimental one | | | | no | no | no | no | no | *yes* |
+
+- **Every record has an FE mode of its parity class, in the same order inside the class.** FE 17 (AS, 213.2 Hz in
+  the baseline) is the only one of the first twelve FE modes without a record.
+- **Baseline.** The five records whose class mode is governed by Y curvature (2, 4, 7, 8, 11) are +8.0 … +15.5 %.
+  The four governed by X curvature (3, 5, 9, 10) are −3.2 … −0.1 % (record 3 inside its mixed pair). Record 1 (twist)
+  and record 6 (both and twist) are +2.4 and +3.8 %.
+- **A common lower E** (H1, H2) closes the Y group and opens the X group by the same amount. This is the pattern of
+  §20.3; here it holds for all 11 records, by class and without a MAC.
+- **The thickness models** leave the Y group at +8 … +14 %.
+- **The experimental sequence of classes** is AA, SS (Y1), SS (X1), AS, SA, SS, SA (Y2), AA, AS (X2), AA, SA. The
+  baseline has SA before AS at records 4 and 5, AS (X2) before SA (Y2), and the two AA modes together. None of the 16
+  models reproduces the sequence.
+
+### 22.7 Assessment of the directional stiffness hypothesis
+
+**Supported by the existing data (verified computations):**
+
+1. The grid convention of §21.5 equals §16: the softer direction is curvature along FE Y under placement D.
+2. The two experimental one-direction ratios, 0.860 and 0.863, agree with each other.
+3. The plan (1.007), G12 and a common E (1.007), and the two thickness models (0.986, 0.982) cannot produce them. A
+   difference between E1 and E2 can, with the square-root law of §22.5.
+4. The sign and size of the baseline frequency error of all 11 records follow the curvature that governs the FE
+   mode of the record's class (§22.6).
+5. One ratio, E1 / E2 = 1.37, taken from the experimental frequencies alone, is expected to bring every class within
+   4.4 % and to give the experimental class sequence (§22.8). This is an expectation from a reduced basis, not a
+   solve.
+
+**Not shown, or against it:**
+
+- **The cause.** A homogeneous shell needs E1 ≠ E2 for this. A real laminate does not: its bending stiffnesses in two
+  directions depend on the stacking sequence and differ even when the in-plane moduli are equal. The layup is not
+  recorded (§15). An initial curvature of the 0.875 mm plate or the suspension could contribute. The frequencies do
+  not separate these.
+- **It is not a material value.** A frequency gives D = E h³ / 12 (1 − ν12 ν21) per direction, not E (§20.3). "E2 =
+  41 000 MPa" is a way of writing a bending stiffness ratio in the existing model. `NOT_A_MATERIAL_PROPERTY`.
+- **Session 261016** gives 0.811 for the order-1 ratio (55.25 / 68.10) against 0.860 here. The ratio is therefore not
+  a constant of the specimen alone, or the one X record of 261016 is not comparable.
+- **A residual common to both directions.** The order-1 classes are expected 4.2–4.4 % low and the order-2 classes
+  1.0–1.2 % low. A stiffness ratio cannot change that.
+- **Mixed records.** Records 3 and 4 share the classes SS and AS; records 7 and 8 share SA and AA. In both cases the
+  parity about the X centre line is broken and the parity about the Y centre line is kept (0.98–1.00 for all 11
+  records). A homogeneous orthotropic plate keeps both. A thickness gradient along X breaks exactly this one, and the
+  wedge raises record 7 to 0.97 (§18). So the stiffness ratio and the thickness asymmetry act on different features
+  and both may be present. That is a hypothesis.
+- **No response between 195 and 241 Hz.** The stored indicator has no local maximum of 1 dB or more there, inside
+  the PolyMAX band. The expectation puts an AS mode at 210 Hz, and the baseline puts FE 17 at 213 Hz. Whether that
+  mode was not excited or does not exist there is not known; the excitation point is not recorded.
+- **The registration.** §22.4 shows that the nominal mapping is doubtful along X. The class comparison of §22.5 and
+  §22.6 does not use the point positions; every MAC does.
+
+**Verdict.** The directional stiffness hypothesis (H4 of §21.6) is consistent with every frequency and class
+observation available, and no archived alternative is. It is **not confirmed**: no model with such a ratio has been
+solved, the cause is undetermined, and no value is released. H5 of §21.6 is answered differently than expected: the
+discrepancies of records 5, 6, 10 and 11 are, by the indication of §22.4, mainly a matter of the mapping along X.
+
+### 22.8 One proposed FE test (prepared, not executed)
+
+**Model.** `S4R_0875_BASELINE` with one changed constant: **E2 = 41 000 MPa**; E1 = 56 000 MPa, G12 = 5 000 MPa,
+ν12 = 0.05, thickness 0.875 mm, density, mesh and free-free conditions unchanged. One eigenfrequency solve and one
+ODB extraction, each needing a separate owner authorisation.
+
+- **Where the value comes from.** r = (f_X / f_Y)² × (301 / 300)⁴ from the experimental frequencies and the plan
+  alone: 1.370 from records 2 and 3, 1.362 from records 7 and 9, mean 1.366. E2 = 56 000 / 1.366 = 41 003, rounded.
+  E1 is the archived template value. No FE frequency enters the value. The direction follows §22.2
+  (`CONVENTION_ONLY`). It is a hypothesis test with one declared number, not a fit and not a material constant.
+- **How the expectation was obtained.** A reduced basis of the 14 baseline shapes: thin-plate bending energy forms on
+  the 101 × 101 node grid and a 14 × 14 eigenproblem. Check: it reproduces the baseline frequencies to 0.22 % before
+  any correction, and the frequencies of the eleven archived variants with a changed E1, E2 or small G12 step to
+  0.01–0.07 % for FE 7–19 (G12 ×2: 0.6 %; G12 ×3: 1.6 %; FE 20 is outside the use, up to 3.8 %). The step to
+  E2 −27 % is larger than any archived one, so the expectation is itself part of what the solve tests.
+
+**Expected frequencies and shapes** (reduced basis; an expectation, not a result):
+
+| FE mode | Expected Hz | Class on the whole plate | Baseline branch content | Record of the class order | Expected error |
+|---|---|---|---|---|---|
+| 7 | 19.02 | AA, twist | FE 7 | 1 | +2.1 % |
+| 8 | 52.23 | SS, **Y1** (Y share 0.99) | FE 8 and 9, separated | 2 | −4.4 % |
+| 9 | 60.81 | SS, **X1** (X share 0.99) | FE 8 and 9, separated | 3 | −4.2 % |
+| 10 | 64.83 | AS | FE 11, now below FE 10 | 4 | −3.0 % |
+| 11 | 71.71 | SA | FE 10 | 5 | −3.4 % |
+| 12 | 111.84 | SS | FE 12 | 6 | −0.4 % |
+| 13 | 144.25 | SA, **Y2** | FE 14, now below FE 13 | 7 | −1.2 % |
+| 14 | 154.72 | AA, Y-governed | FE 15 and 16, separated | 8 | −2.0 % |
+| 15 | 167.45 | AS, **X2** | FE 13 | 9 | −1.0 % |
+| 16 | 176.83 | AA, X-governed | FE 15 and 16, separated | 10 | −1.8 % |
+| 17 | 194.90 | SA | FE 18 | 11 | +1.7 % |
+| 18 | 210.16 | AS | FE 17 | none | — |
+
+- **Expected shape changes.** The pairs FE 8 / 9 and FE 15 / 16 separate into one Y-governed and one X-governed
+  mode. The Y-governed mode of each close pair moves below the X-governed one (FE 11 below FE 10, FE 14 below
+  FE 13, FE 18 below FE 17), and the Y-governed AA mode comes between Y2 and X2. No mode leaves its parity class: a homogeneous
+  material cannot mix classes.
+- **Expected research MAC (reported, not a criterion).** Nominal mapping: 0.91, 0.97, 0.33, 0.55, 0.48, 0.52, 0.79,
+  0.92, 0.26, 0.25, 0.55 for records 1–11. Control geometry of §22.4: 0.97, 0.97, 0.69, 0.56, 0.99, 1.00, 0.80,
+  0.80, 0.99, 0.98, 0.96. Records 3, 4, 7 and 8 are expected to stay below 0.9 in either case (§22.7, mixed records).
+
+**Falsification criteria, written before any solve.** Both are whole-plate quantities and do not depend on the point
+mapping.
+
+1. **Class sequence.** The parity classes of FE modes 7–17 of the solved model, in ascending frequency, must be AA,
+   SS (Y1), SS (X1), AS, SA, SS, SA (Y2), AA, AS (X2), AA, SA. Any other sequence rejects the hypothesis in this form.
+2. **Class frequencies.** For each of the 11 records the FE mode of its class order must lie within ± 5 % of the
+   record. Records 2, 3, 7 and 9 gave the ratio; records 1, 4, 5, 6, 8, 10 and 11 are the test. One record outside
+   ± 5 % rejects a single stiffness ratio as a sufficient description. The expectation leaves 0.6 % of margin at
+   records 2 and 3. ± 5 % is the existing descriptive level; it is not a gate.
+3. **If the solved frequencies of FE 7–18 differ from the expected ones by more than 1 %,** the reduced basis is not
+   valid at this step; criteria 1 and 2 are then judged on the solve alone.
+
+- **What a passed test would mean.** That one bending stiffness ratio describes the frequencies of this plate in the
+  261027 setup. Not its cause, not E1 or E2 of the material, and no pairing.
+- **What it cannot test.** The mixing of records 3 / 4 and 7 / 8, the 3 % residual between the orders, and the scan
+  window.
+
+### 22.9 Qualification of the conclusion of §21
+
+§21 stated that the FE discrepancy of records 5, 6, 9, 10 and 11 "is not an artefact of the modal fit". The checks
+of §21 do not carry that statement, and it is withdrawn in that form (§21 is amended accordingly).
+
+- **The refit with fixed poles is not independent.** It is a linear solve on the same transfer functions with the
+  same 11 poles. A wrong, missing or spurious pole would still return residues that agree with the stored ones. It
+  shows that the stored shapes are the residues of that response at those poles, and nothing about the poles.
+- **Response support is not independent either.** The peaks and the response shapes come from the data PolyMAX was
+  fitted to. They show that a record corresponds to something in the response. They do not show that it is one mode,
+  that its frequency and damping are right, or that no mode was missed.
+- **Not available.** One force reference; the stabilisation diagrams exist only as images and were not read; no
+  uncertainty of any pole; no second estimator and no repeat of the setup.
+- **What §21 does establish.** The stored shapes are consistent with the stored response; ten records have a clear
+  resonance; the shapes are distinct and smooth. That is experimental support, not validation of the poles.
+- **What this section adds.** Nine records are nearly pure in one parity class, and the four one-direction records
+  have nodal lines where free bending shapes have them. This is plausibility of the shapes, again not a validation of
+  the poles. The low MAC of the records that vary along FE X has a candidate cause outside the modal fit and outside
+  the FE model: the nominal scan window (§22.4).
+
+### 22.10 Limitations
+
+- No model with the stiffness ratio has been solved. §22.8 is an expectation.
+- The class of a record is taken on its own grid; the class of an FE mode on the whole plate. For the mixed records
+  3, 4, 7 and 8 the dominant class is used (0.72, 0.57, 0.80, 0.82).
+- The level 0.70 for a one-direction class was first used for record 3 in §21.5, after its value was known.
+- The control geometry assumes that records 2, 3, 7 and 9 are free bending of the whole side, and it neglects any
+  rotation of the grid. It conflicts with the M11 reconstruction and is not adopted.
+- Suspension, force sensor and interior thickness remain unmodelled (§20.4). `PHYSICAL_REGISTRATION_NOT_VERIFIED`,
+  D-044 and SPEC §5.2 (no traceable material axes) stand.
+
+### 22.11 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `e37add12…` and a clean tracked tree before the edit |
+| Input hashes | experiment, nominal geometry, baseline package, the results of §18–§21, the wedge and field extraction files and the 13 variant INP, ODB or manifest files equal their recorded hashes; 304 input files have the same size and mtime before and after |
+| Shape identity | the research MAC recomputed from the loaded fields equals §20 for 14 models (6.7e-16) and §19 for the two thickness models (3.3e-16) |
+| Descriptor consistency | synthetic directional shapes of §22.3; axis exchange exchanges the outputs; the descriptors of the 11 records equal §21.5 (difference 0.0) |
+| Axis mapping | §22.2: equal to §16; residual 0.31 mm rms |
+| Reduced basis | baseline and 13 archived variants reproduced (§22.8) |
+| Reproducibility | two complete runs give byte-identical `results.json` (`e94bd2c9…`), `arrays.npz`, `results_addendum.json` (`e5a0eb69…`) and `arrays_addendum.npz` |
+| Tests | `research/m11_r65`: 29 OK. `tests.test_plate_study`: 30 OK. `tests.test_experimental_qc`: 27 OK (4 skipped). `tests.test_plate_registration_readiness`: 18 OK. `tests.test_plate_rc1_owner_clarification`: 12 OK |
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_DIRECTIONAL_STIFFNESS_01` (outside git):
+`run_directional.py`, `protocol.json` (`5431bea5…`), `results.json`, `arrays.npz`, `run_addendum.py`,
+`protocol_addendum.json` (`3b6b4466…`), `results_addendum.json`, `arrays_addendum.npz`, `report.py`,
+`fig_directional_shapes.png`, `fig_directional_frequencies.png`.
+
+Nothing is published in the repository except this section and the amendment of §21.
 
 ## Not changed
 
