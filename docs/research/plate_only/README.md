@@ -1,10 +1,10 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24; the prospective directional stiffness test of §22.8 solved with one owner-authorised Abaqus solve and one ODB extraction, all three criteria met, 2026-11-26, see §25). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24; the prospective directional stiffness test of §22.8 solved with one owner-authorised Abaqus solve and one ODB extraction, all three criteria met, 2026-11-26, see §25; the combined model with the wedge thickness of §18 and the stiffness ratio of §25, one owner-authorised Abaqus solve and one ODB extraction, record 7 explained, records 3 and 4 not, one record outside ± 5 %, 2026-11-26, see §26). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No LM, parameter fit
-or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in three sections: one ODB
-extraction of an archived result (§18), one eigenfrequency solve with one ODB extraction (§19), and one eigenfrequency
-solve with one ODB extraction (§25). §1–§17 and
+or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in four sections: one ODB
+extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction in each of §19, §25
+and §26. §1–§17 and
 §20–§24 ran no Abaqus; §21 reads experimental files only, §23 reads instrument records only, the others read
 existing FE results. §24 is the only section that changes program code (`src/services/psv_video_registration.py`).
 
@@ -3299,7 +3299,8 @@ basis would be wrong about the pair separation, whatever the frequencies did.
   E1 = 56 000 MPa.
 - **One model, one value.** No neighbouring ratio was solved, so nothing is known from a solve about how sharply the
   criteria select 1.366. The archived E2 −5 % and −10 % models show the same direction of change (§24.7).
-- **Three shapes are not described:** records 3, 4 and 7. The model keeps the parity classes apart and these records
+- **Three shapes are not described:** records 3, 4 and 7. (**§26:** the combined model describes record 7; records 3
+  and 4 stay.) The model keeps the parity classes apart and these records
   mix them.
 - **A residual of 3 % between the orders remains** (§25.5), and the margin of criterion 2 is 0.62 % at record 2.
 - **Session 261016** gives another order-1 ratio (0.811 against 0.860, §22.7). The ratio is not shown to be a
@@ -3342,6 +3343,430 @@ Changed in the repository: this report only.
 `protocol.json`, `solve\` (INP, `.dat`, `.odb`, `.sta`, `.msg`, logs), `scripts\extract_odb.py`, `logs\`,
 `extraction\` (manifest, geometry, 20 modes), `identity.json`, `run_test.py`, `results.json`, `arrays.npz`,
 `report.py`, `fig_frequency_error_class_order.png`, `fig_mac_matrix_solved.png`, `fig_shapes_exp_vs_fe.png`.
+
+## 26. PLATE-0875-COMBINED-MODEL-01 — thickness gradient and directional stiffness together (2026-11-26)
+
+`RESEARCH_ONLY`, `PHYSICAL_REGISTRATION_NOT_VERIFIED`, `NOT_A_MATERIAL_PROPERTY`, `MODEL_FORM_HYPOTHESIS`. One
+combined model is compared with the three existing states. It is a hypothesis about the form of the model, not an
+identification: no parameter was fitted or adjusted, no LM or Auto-ID was run, no value is released, no pairing
+status and no `FrozenRegistration` were produced. M8 GATE NOT_MET, D-077 `NO_GLOBAL_PARAMETER_VALUE` and production
+Auto-ID BLOCKED are unchanged. No program code, test, registration, gate or tool was changed.
+
+**Abaqus use (owner authorisation: one solve and one corresponding extraction).**
+
+| Action | Count | Detail |
+|---|---|---|
+| Abaqus solves | **1** | `CFRP_S4R_WEDGE_E2_41000_FreeFree`, Abaqus/Standard 2024, cpus = 1, interactive; 2026-11-26 16:11:56, 12.5 s, exit 0; no retry |
+| ODB extractions | **1** | pinned extractor `039aa067…`, modes 1–20; 16:12:08, 5.3 s, exit 0; the ODB is unchanged by it; no retry |
+
+**Short answer.** The combination improves the shapes and costs a little in frequency. It explains record 7, it does
+not explain records 3 and 4, and one record leaves the ± 5 % level.
+
+| Question of the task | Result |
+|---|---|
+| EXP 7 | **improved and described:** 0.79 → **0.98** |
+| EXP 3 | not improved: 0.68 → 0.72 (rise 0.03, below the declared 0.05) |
+| EXP 4 | not improved: 0.56 → 0.58 |
+| All class frequency errors within ± 5 % | **no:** record 2 at −5.26 % (−4.38 % in §25); the ten others within, largest −4.80 % (record 3) |
+| Deterioration of the eight well-matched records | none: largest fall 0.008 |
+| Additive effects | no: the gain of record 8 (0.81 → 0.96) appears only in the combination |
+
+- **Shapes.** Mean first-ranked research MAC 0.75 (baseline), 0.80 (thickness only), 0.88 (directional only),
+  **0.92** (combined). Nine records are at 0.95–0.99 in the combined model; records 3 and 4 remain the only ones
+  below 0.80.
+- **Frequencies.** Mean absolute error 2.3 % → 2.7 %, largest 4.4 % → 5.3 %. The frequency agreement of §25 is
+  therefore **not kept in full**. Most of the loss is a common shift of about −0.6 %: the wedge has a mean thickness
+  of 0.870 mm against 0.875 mm.
+- **The expectation written before the solve was right,** including the failure at record 2: frequencies to 0.09 %,
+  research MAC to 0.002.
+- **Assessment.** The combined model is the best description of the shapes examined so far, and it answers the
+  question about record 7. It is not a better description of the frequencies, and it leaves records 3 and 4
+  unexplained.
+
+### 26.1 The model and its exact differences
+
+| Item | Value |
+|---|---|
+| Source | the archived wedge INP of §18, `CFRP_S4R_WEDGE_FreeFree.inp`, SHA-256 `dcb639f1…`, read only |
+| Combined input | `CFRP_S4R_WEDGE_E2_41000_FreeFree.inp`, SHA-256 `819de855…`, written before the solve; 30 466 lines, as the source |
+| Difference 1, thickness | the 10 201 archived nodal values reassigned by the reflection X → 301 − X: 10 100 lines differ, the 101 lines of the centre column do not. The set of values is the archived one (a permutation; difference to the reflected archived field 0.0) |
+| Difference 2, elastic | line 30441: `56000.,56000., 8500., …` → `56000.,41000., 8500., …`. The elastic lines equal those of the §25 input |
+| Nothing else | every other line is identical to the archived wedge INP: same keywords, density, section, step, 20 requested modes, output, no boundary keyword |
+| Against the baseline | `*Nodal Thickness` and the `nodal thickness` option of the shell section; E2; the header lines |
+| Constants | E1 = 56 000, **E2 = 41 000**, G12 = 5 000 MPa; E3, ν12, ν13, ν23, G13, G23 as in the baseline |
+
+**Thickness orientation.**
+
+| Check | Result |
+|---|---|
+| Field | linear in X, 0.81 mm at X = 0 to 0.93 mm at X = 301 (deviation from the line 6·10⁻⁹ mm); no Y dependence (0.0) |
+| Edges | mean 0.812 mm for X < 10 and 0.928 mm for X > 291; the measured edge means are 0.816 mm (edge 2, at X = 0 under D) and 0.926 mm (edge 4, at X = 301) |
+| Source of the orientation | the edge readings under placement D (§18.2, §19.1). No MAC and no frequency entered it |
+| Relation to §18 | the archived solve has its thick side at X = 0; §18 reflected its results. Here the reflected field is in the input itself, so the solved fields are used as extracted |
+| No new distribution | the values are those of the archived analytical field; nothing was added or re-estimated |
+
+**Integrated mass.**
+
+| Quantity | Value |
+|---|---|
+| `.dat` of the combined model | 117.684 g |
+| Integrated from the INP (ρ × area × mean nodal thickness per element) | 117.684 g |
+| Archived wedge `.dat` | 117.684 g (equal) |
+| Baseline `.dat` | 118.361 g (combined −0.57 %) |
+| Recorded specimen mass | 118.37 g (combined −0.58 %) |
+| Centre of mass | (153.96, 150.00, 0) mm; the archived wedge has 147.04: the reflection, as intended |
+| Density | 1.498·10⁻⁹ t / mm³, unchanged. **No density correction was made** |
+
+### 26.2 Declared before the solve
+
+`protocol.json` (`b24e74b3…`) and `expectation.json` (`7b626e56…`) were written before the solve and are verified at
+every analysis run.
+
+**Correspondence of records and FE modes.** Record k against FE mode 6 + k in ascending frequency, the order
+established in §25, cross-checked by FE-to-FE tracking against the directional-only model. No EXP MAC enters it. For
+the two archived states the class-order modes of §22.6 are used, as in §24.
+
+**Criteria.**
+
+| | Criterion |
+|---|---|
+| A | Records 3, 4, 7: first-ranked research MAC in the combined model minus the directional-only one. `IMPROVED` at a rise of 0.05 or more; `DESCRIBED` at 0.80 or more |
+| B | All 11 records within ± 5 % of FE mode 6 + k (the existing descriptive level; not a gate) |
+| C | Records at 0.80 or above in the directional-only model (1, 2, 5, 6, 8, 9, 10, 11): `DETERIORATED` at a fall of more than 0.05 or below 0.80. Every frequency error that grows by more than 0.5 points is listed |
+| D | Interaction: combined − baseline against (thickness only − baseline) + (directional only − baseline), for the frequency and the research MAC of the corresponding mode. `NON-ADDITIVE` above 0.5 points or 0.05. Additivity is assumed nowhere |
+| Overall | "improves the model" if A is `IMPROVED` for at least one of records 3, 4, 7 and C shows no deterioration; "keeps the frequency agreement of §25" only if B holds. Reported separately |
+
+**Expected effects** (reduced basis with the thickness field: 14 singular vectors of the 39 shapes FE 7–19 of the
+three existing states; largest raw error on those three states 0.23 %; an expectation, itself tested by the solve):
+
+- record 7 rises from 0.79 to about 0.98; record 8 from 0.81 to about 0.96;
+- records 3 and 4 change by less than 0.05 (0.72 and 0.58);
+- no deterioration of the eight well-matched records;
+- most frequencies fall by 0.3–0.9 %, FE 13 by about 2 %;
+- **criterion B is expected to fail at record 2** (about −5.3 %), with record 3 near the limit (−4.8 %);
+- FE 13 and 14 are expected to interact with the wedge.
+
+**The expectation against the solve.**
+
+| Quantity | Result |
+|---|---|
+| Frequencies FE 7–18 | largest difference 0.093 % |
+| Shapes FE 7–18 | MAC of expected and solved shape at least 0.9986 |
+| Research MAC, 11 × 12 | largest difference of an element 0.002; the same first-ranked modes |
+
+### 26.3 Solver completion and extraction integrity
+
+| Check | Result |
+|---|---|
+| Solve | "THE ANALYSIS HAS COMPLETED SUCCESSFULLY" in `.sta`; `JOB … COMPLETED` in the console log; exit 0 |
+| Messages | 0 errors and 0 warnings in `.dat`; `.msg`: 0 warning messages, 0 error messages |
+| Rigid modes | modes 1–6 below 0.01 Hz; no non-positive eigenvalue among modes 7–20 |
+| Extraction | exit 0; 22 files; 20 "Extracted mode" lines; 10 201 nodes |
+| ODB | SHA-256 `fefb87e5…` before and after the extraction |
+| Frequencies | manifest = `.dat` for modes 7–20 (relative difference 0.0) |
+| Geometry | node labels, coordinates and connectivity equal the baseline package; INP nodes reproduce the extracted geometry to 1.5·10⁻⁵ mm |
+| Field | in-plane displacement / U3 at most 1.3·10⁻¹¹ |
+
+The 36 files of the solve, the extraction, the protocol and the expectation were hashed once after the extraction
+(`identity.json`).
+
+### 26.4 The four states
+
+| State | Model | Source |
+|---|---|---|
+| Baseline | uniform 0.875 mm, E1 = E2 = 56 000 MPa | archived (§17) |
+| Thickness only | wedge 0.81 → 0.93 mm, E1 = E2 = 56 000 MPa | archived solve of §18, results reflected in X |
+| Directional only | uniform 0.875 mm, E2 = 41 000 MPa | §25 |
+| Combined | wedge 0.81 → 0.93 mm, E2 = 41 000 MPa | this solve |
+
+**Frequencies, Hz.**
+
+| FE mode | Baseline | Thickness only | Directional only | Combined |
+|---|---|---|---|---|
+| 7 | 19.07 | 19.00 | 19.02 | 18.94 |
+| 8 | 59.87 | 59.39 | 52.23 | 51.74 |
+| 9 | 62.01 | 61.44 | 60.81 | 60.45 |
+| 10 | 71.85 | 71.43 | 64.82 | 64.64 |
+| 11 | 72.19 | 72.10 | 71.71 | 71.29 |
+| 12 | 116.58 | 115.93 | 111.79 | 111.15 |
+| 13 | 167.49 | 164.12 | 144.26 | 141.13 |
+| 14 | 168.61 | 166.42 | 154.71 | 155.63 |
+| 15 | 174.80 | 174.80 | 167.45 | 166.38 |
+| 16 | 179.90 | 180.49 | 176.83 | 175.70 |
+| 17 | 213.20 | 211.86 | 194.82 | 193.91 |
+| 18 | 213.95 | 213.10 | 210.07 | 208.74 |
+| 19 | 295.78 | 294.06 | 281.38 | 273.55 |
+| 20 | 327.90 | 318.18 | 282.86 | 279.70 |
+
+The mode numbers are positions in ascending frequency within each state. They are not branches: §26.6.
+
+**Four-model comparison** (corrected positions of §24; all 11 records kept):
+
+| Quantity | Baseline | Thickness only | Directional only | Combined |
+|---|---|---|---|---|
+| Mean first-ranked research MAC | 0.746 | 0.802 | 0.878 | **0.917** |
+| Records at 0.80 or above | 5 | 6 | 8 | **9** |
+| Records at 0.50 or above | 9 | 10 | 11 | 11 |
+| Records below 0.80 | 2, 3, 4, 7, 8, 10 | 2, 3, 4, 8, 10 | 3, 4, 7 | **3, 4** |
+| First-ranked mode = corresponding mode | 7 of 11 | 9 of 11 | 11 of 11 | 11 of 11 |
+| Mean absolute frequency error, corresponding modes | 6.22 % | 5.92 % | **2.29 %** | 2.73 % |
+| Largest absolute frequency error | 15.54 % | 12.46 % | **4.38 %** | 5.26 % |
+| Signed mean frequency error | +5.01 % | +4.35 % | −1.61 % | −2.20 % |
+| Records outside ± 5 % | 2, 4, 7, 8, 11 | 2, 4, 7, 8, 11 | **none** | 2 |
+| Smallest share of a record in the span of the 14 shapes | 0.96 | 0.96 | 0.96 | 0.96 |
+
+### 26.5 All 11 records
+
+**First-ranked research MAC** (FE mode in brackets; range over the 59 declared scenarios for the combined model):
+
+| EXP | Hz | Baseline | Thickness only | Directional only | **Combined** | Range, combined | Combined − directional only |
+|---|---|---|---|---|---|---|---|
+| 1 | 18.63 | 0.97 (7) | 0.97 (7) | 0.97 (7) | **0.97** (7) | 0.96–0.97 | +0.00 |
+| 2 | 54.62 | 0.52 (9) | 0.54 (8) | 0.97 (8) | **0.99** (8) | 0.98–0.99 | +0.02 |
+| **3** | 63.50 | 0.45 (8) | 0.39 (9) | 0.68 (9) | 0.72 (9) | 0.71–0.72 | +0.03 |
+| **4** | 66.85 | 0.56 (11) | 0.57 (11) | 0.56 (10) | 0.58 (10) | 0.57–0.59 | +0.02 |
+| 5 | 74.21 | 0.99 (10) | 0.99 (10) | 0.99 (11) | **0.99** (11) | 0.97–0.99 | +0.00 |
+| 6 | 112.27 | 0.99 (12) | 0.98 (12) | 0.99 (12) | **0.98** (12) | 0.96–0.99 | −0.01 |
+| **7** | 145.94 | 0.79 (14) | 0.96 (13) | 0.79 (13) | **0.98** (13) | 0.95–0.98 | **+0.19** |
+| 8 | 157.85 | 0.43 (16) | 0.74 (16) | 0.81 (14) | **0.96** (14) | 0.93–0.97 | **+0.16** |
+| 9 | 169.18 | 0.98 (13) | 0.98 (14) | 0.98 (15) | **0.98** (15) | 0.96–0.98 | +0.00 |
+| 10 | 180.14 | 0.57 (15) | 0.75 (15) | 0.97 (16) | **0.97** (16) | 0.95–0.98 | +0.00 |
+| 11 | 191.60 | 0.96 (18) | 0.94 (18) | 0.96 (17) | **0.95** (17) | 0.91–0.96 | −0.01 |
+
+In all 59 scenarios the first-ranked mode of every record is unchanged, in each of the four states.
+
+**Frequency error of the corresponding mode** (signed, FE mode in brackets):
+
+| EXP | Hz | Baseline | Thickness only | Directional only | **Combined** | Growth of the absolute error, combined against directional only |
+|---|---|---|---|---|---|---|
+| 1 | 18.63 | +2.37 % (7) | +1.97 % (7) | +2.08 % (7) | +1.68 % (7) | −0.40 |
+| 2 | 54.62 | +9.62 % (8) | +8.73 % (8) | −4.38 % (8) | **−5.26 %** (8) | **+0.89** |
+| 3 | 63.50 | −2.34 % (9) | −3.24 % (9) | −4.23 % (9) | −4.80 % (9) | +0.57 |
+| 4 | 66.85 | +7.99 % (11) | +7.86 % (11) | −3.04 % (10) | −3.30 % (10) | +0.27 |
+| 5 | 74.21 | −3.19 % (10) | −3.75 % (10) | −3.37 % (11) | −3.94 % (11) | +0.57 |
+| 6 | 112.27 | +3.84 % (12) | +3.26 % (12) | −0.42 % (12) | −0.99 % (12) | +0.57 |
+| 7 | 145.94 | +15.54 % (14) | +12.46 % (13) | −1.15 % (13) | −3.29 % (13) | **+2.14** |
+| 8 | 157.85 | +10.74 % (15) | +10.74 % (15) | −1.99 % (14) | −1.41 % (14) | −0.58 |
+| 9 | 169.18 | −1.00 % (13) | −1.63 % (14) | −1.03 % (15) | −1.66 % (15) | +0.63 |
+| 10 | 180.14 | −0.13 % (16) | +0.20 % (16) | −1.84 % (16) | −2.46 % (16) | +0.63 |
+| 11 | 191.60 | +11.66 % (18) | +11.22 % (18) | +1.68 % (17) | +1.20 % (17) | −0.47 |
+
+**Full research MAC matrix, combined model** (bold: first-ranked):
+
+| EXP | FE 7 | FE 8 | FE 9 | FE 10 | FE 11 | FE 12 | FE 13 | FE 14 | FE 15 | FE 16 | FE 17 | FE 18 | FE 19 | FE 20 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | **0.97** | 0.00 | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 2 | 0.00 | **0.99** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 3 | 0.00 | 0.00 | **0.72** | 0.24 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 4 | 0.00 | 0.02 | 0.38 | **0.58** | 0.00 | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 5 | 0.01 | 0.00 | 0.00 | 0.00 | **0.99** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 6 | 0.00 | 0.01 | 0.00 | 0.01 | 0.00 | **0.98** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 7 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.98** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 8 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.96** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 9 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.98** | 0.00 | 0.01 | 0.00 | 0.00 | 0.00 |
+| 10 | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.97** | 0.01 | 0.00 | 0.00 | 0.00 |
+| 11 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 | 0.00 | 0.00 | 0.01 | **0.95** | 0.01 | 0.00 | 0.01 |
+
+The matrices of the three other states are those of §24.4 (baseline, thickness only) and §25.6 (directional only);
+they are reproduced here with difference 0.0 and shown together in `fig_mac_four_states.png`.
+
+### 26.6 Branches and subspaces
+
+FE-to-FE real MAC of U3 on all 10 201 nodes, assignment as in §20; tracked at 0.90 or more. A lost branch is
+reported as lost and is not replaced by another mode.
+
+**Combined against directional only** (the reference of the correspondence):
+
+| Directional only | Hz | Combined | Hz | MAC | Status | Second combined mode | Frequency change | Parity share, combined |
+|---|---|---|---|---|---|---|---|---|
+| 7 | 19.02 | 7 | 18.94 | 1.00 | tracked | — | −0.39 % | AA 1.00 |
+| 8 | 52.23 | 8 | 51.74 | 0.98 | tracked | FE 10: 0.01 | −0.93 % | SS 0.98 |
+| 9 | 60.81 | 9 | 60.45 | 1.00 | tracked | — | −0.60 % | SS 1.00 |
+| 10 | 64.82 | 10 | 64.64 | 0.99 | tracked | FE 8: 0.02 | −0.28 % | AS 0.99 |
+| 11 | 71.71 | 11 | 71.29 | 1.00 | tracked | — | −0.59 % | SA 1.00 |
+| 12 | 111.79 | 12 | 111.15 | 1.00 | tracked | — | −0.57 % | SS 1.00 |
+| 13 | 144.26 | 13 | 141.13 | **0.83** | **lost** | FE 14: 0.14 | (−2.17 %) | SA 0.83 |
+| 14 | 154.71 | 14 | 155.63 | **0.84** | **lost** | FE 13: 0.17 | (+0.59 %) | AA 0.84 |
+| 15 | 167.45 | 15 | 166.38 | 1.00 | tracked | — | −0.64 % | AS 1.00 |
+| 16 | 176.83 | 16 | 175.70 | 1.00 | tracked | — | −0.64 % | AA 1.00 |
+| 17 | 194.82 | 17 | 193.91 | 0.98 | tracked | — | −0.47 % | SA 0.98 |
+| 18 | 210.07 | 18 | 208.74 | 1.00 | tracked | — | −0.63 % | AS 1.00 |
+| 19 | 281.38 | 20 | 279.70 | 0.99 | tracked | — | −0.60 % | AA 0.99 |
+| 20 | 282.86 | 19 | 273.55 | 0.65 | lost | — | (−3.29 %) | SS 0.66 |
+
+- **11 of 14 tracked.** Nine of the 11 modes that correspond to records are tracked to the same position, so the
+  correspondence "record k, FE 6 + k" is confirmed by tracking for records 1–6 and 9–11.
+- **Lost: FE 13 and FE 14, the modes of records 7 and 8.** The wedge mixes the Y2 mode (SA) with the neighbouring
+  AA mode: each combined mode carries 0.83–0.84 of its directional-only counterpart and 0.14–0.17 of the other.
+  Their two-mode subspace is kept only approximately (largest principal angle 7.7°). **For records 7 and 8 the
+  correspondence is therefore not confirmed by tracking;** it rests on the frequency position and on the dominant
+  parity class (SA 0.83, AA 0.84). The frequency changes in brackets are not branch quantities.
+- **This loss is the mechanism of the improvement.** The mixing that breaks the two branches is what the shapes of
+  records 7 and 8 contain (§25.7: record 7 with FE 13 / 14 at 0.79 / 0.18, record 8 at 0.17 / 0.81).
+- **FE 19 and 20 exchange** (the combined FE 19 is the directional-only FE 20, MAC 0.65, lost). Both are above the
+  records.
+
+**Combined against the two other states.**
+
+| Reference | Tracked | Lost | Order exchanges among the tracked |
+|---|---|---|---|
+| Baseline | 8 of 14 | 8, 9, 14, 15, 16, 20 | 10 ↔ 11, 13 → 15, 17 ↔ 18, 19 → 20 |
+| Thickness only | 10 of 14 | 8, 9, 15, 16 | 10 ↔ 11, 14 → 15, 17 ↔ 18, 19 ↔ 20 |
+
+- Against the baseline the lost branches are those of §25.4 (8, 9, 15, 16, 20) and, in addition, 14 (MAC 0.83).
+- Against the thickness-only state the pairs 8 / 9 and 15 / 16 are redistributed (MAC 0.58 / 0.42 and 0.75 / 0.24),
+  and the wedge mode of record 7 (thickness-only FE 13) is kept at 0.985.
+
+**Subspaces** (largest principal angle between the spans of the modes with the same position numbers):
+
+| Group | Against directional only | Against thickness only | Against baseline |
+|---|---|---|---|
+| FE 8–9 | 8.8° | 2.9° | 8.8° |
+| FE 8–11 | 2.9° | 0.6° | 2.9° |
+| FE 13–16 | 7.7° | 2.1° | 7.8° |
+| FE 7–18 | 4.7° | 1.0° | 4.8° |
+
+- The spans of the combined model are close to those of the thickness-only model and further from the two uniform
+  models. The wedge sets the subspace; the stiffness ratio decides how the modes are combined inside it.
+- The share of each record in the groups FE 8–11 and FE 13–16 is the same in all four states (records 2–5:
+  0.96–0.99; records 7–10: 0.96–0.99).
+
+### 26.7 Records 3, 4 and 7, and the interaction of the two effects
+
+**Record 7: explained by the combination.** 0.79 in both uniform models, 0.96 with the wedge alone, **0.98**
+combined (0.95–0.98 over the scenarios). The wedge alone gives the shape but leaves the frequency 12.5 % too high;
+the combination gives the shape at −3.3 %. Its mode is the Y2 mode mixed with the neighbouring AA mode.
+
+**Records 3 and 4: not explained.**
+
+| EXP | MAC with FE 9 (SS, X1) | MAC with FE 10 (AS) | Share in the span of FE 8–11 |
+|---|---|---|---|
+| 3, directional only | 0.68 | 0.26 | 0.96 |
+| 3, combined | 0.72 | 0.24 | 0.96 |
+| 4, directional only | 0.41 | 0.56 | 0.98 |
+| 4, combined | 0.38 | 0.58 | 0.98 |
+
+- Both records remain mixtures of the two modes. The changes (+0.03 and +0.02) are below the declared 0.05. They
+  are of the size of the scenario range or a little above it (0.01 wide for both records) and point to a small improvement.
+- **The wedge breaks the right symmetry, but far too weakly here.** A thickness gradient along X mixes classes that
+  differ in the first parity letter. That is the difference between SS and AS (records 3 / 4) as well as between SA
+  and AA (records 7 / 8). In the combined model FE 13 and 14 are mixed (parity share 0.83–0.84), while FE 9 and 10
+  stay almost pure (1.00 and 0.99). The records would need a mixing of 0.24–0.41.
+- So a linear thickness gradient of this size is not the cause of the mixing of records 3 and 4. What is: not
+  known. Both lie 0.96–0.98 inside the span of four FE shapes, so it is a matter of how the model combines them.
+
+**Interaction** (criterion D; the two effects are not assumed to add):
+
+| EXP | Frequency change against the baseline: thickness only / directional only / sum / **combined** | Non-additivity | MAC of the corresponding mode: baseline / thickness only / directional only / additive / **combined** | Non-additivity |
+|---|---|---|---|---|
+| 1 | −0.39 / −0.28 / −0.68 / **−0.68 %** | 0.00 | 0.97 / 0.97 / 0.97 / 0.97 / **0.97** | 0.00 |
+| 2 | −0.81 / −12.77 / −13.58 / **−13.58 %** | 0.00 | 0.45 / 0.54 / 0.97 / 1.06 / **0.99** | **−0.07** |
+| 3 | −0.92 / −1.93 / −2.85 / **−2.52 %** | +0.34 | 0.25 / 0.39 / 0.68 / 0.83 / **0.72** | **−0.11** |
+| 4 | −0.12 / −10.21 / −10.34 / **−10.46 %** | −0.12 | 0.56 / 0.57 / 0.56 / 0.57 / **0.58** | +0.01 |
+| 5 | −0.59 / −0.19 / −0.78 / **−0.78 %** | 0.00 | 0.99 / 0.99 / 0.99 / 0.99 / **0.99** | 0.00 |
+| 6 | −0.56 / −4.11 / −4.67 / **−4.66 %** | +0.01 | 0.99 / 0.98 / 0.99 / 0.98 / **0.98** | 0.00 |
+| 7 | −2.66 / −14.44 / −17.10 / **−16.30 %** | **+0.81** | 0.79 / 0.96 / 0.79 / 0.96 / **0.98** | +0.02 |
+| 8 | 0.00 / −11.49 / −11.49 / **−10.97 %** | **+0.53** | 0.37 / 0.21 / 0.81 / 0.64 / **0.96** | **+0.32** |
+| 9 | −0.64 / −0.02 / −0.66 / **−0.66 %** | 0.00 | 0.98 / 0.98 / 0.98 / 0.98 / **0.98** | 0.00 |
+| 10 | +0.33 / −1.71 / −1.38 / **−2.33 %** | **−0.96** | 0.41 / 0.22 / 0.97 / 0.78 / **0.97** | **+0.19** |
+| 11 | −0.40 / −8.94 / −9.34 / **−9.37 %** | −0.03 | 0.96 / 0.94 / 0.96 / 0.95 / **0.95** | +0.01 |
+
+- **Additive where the modes are isolated:** records 1, 5, 6, 9, 11 and the frequencies of records 2 and 4.
+- **Non-additive in the group FE 13–16:** records 7, 8 and 10 in frequency (+0.8, +0.5, −1.0 points), records 8
+  and 10 in MAC (+0.32, +0.19).
+- **Record 8 is the clearest interaction.** The wedge alone lowers the MAC of its corresponding mode (0.37 → 0.21),
+  the stiffness ratio alone raises it to 0.81, and the two together give 0.96. Neither effect alone and no sum of
+  them gives that value: the stiffness ratio first separates the pair FE 15 / 16, and only then can the wedge mix
+  the lower AA mode with Y2 in the way the record shows.
+- **Records 2 and 3 fall short of the additive value** (−0.07, −0.11): both effects act on the same pair FE 8 / 9
+  and saturate (record 2 reaches 0.99).
+- The correspondence of the two archived states is the class order of §22.6; with the first-ranked modes instead,
+  the same records stand out (non-additivity −0.15 for record 8, −0.18 for record 10, +0.09 for record 3). The
+  sign depends on that choice; the absence of additivity does not.
+
+### 26.8 Assessment, and limitations
+
+**Verdict by the criteria declared before the solve.**
+
+| Criterion | Verdict |
+|---|---|
+| A, record 3 | not improved (+0.03), not described (0.72) |
+| A, record 4 | not improved (+0.02), not described (0.58) |
+| A, record 7 | **IMPROVED (+0.19) and DESCRIBED (0.98)** |
+| B, all class frequencies within ± 5 % | **FAIL:** record 2 at −5.26 % |
+| C, no deterioration of the well-matched records | **no deterioration** (largest fall 0.008); frequency error grown by more than 0.5 points for records 2, 3, 5, 6, 7, 9, 10 |
+| D, interaction | non-additive: frequency of records 7, 8, 10; MAC of records 2, 3, 8, 10 |
+| Overall | improves the model in shape (record 7; C holds); **does not keep the frequency agreement of §25 in full** |
+
+**What the result supports.**
+
+1. A stiffness ratio and a thickness gradient along X act together on the group FE 13–16, and only together do they
+   give the shapes of records 7 and 8 (0.98 and 0.96). The suggestion of §22.7 and §24.7, that both may be present,
+   is supported for these records.
+2. The eight records that the directional-only model described are not harmed.
+3. The reduced basis with the thickness field predicted this solve to 0.09 % and 0.002.
+
+**What it does not support, and what limits it.**
+
+- **Records 3 and 4 are not explained** by this combination. This is the main open shape discrepancy.
+- **The frequency agreement is slightly worse.** Ten of the 11 absolute errors change by less than 1 point, record 7
+  by 2.1 points (−1.2 % → −3.3 %), and record 2 crosses the ± 5 % level by 0.26 points. ± 5 % is a descriptive
+  level, not a gate.
+- **Most of the frequency loss is the common level, which neither hypothesis addresses.** The wedge has a mean
+  thickness of 0.870 mm against 0.875 mm, which lowers a bending frequency by about 0.57 %; nine of the 11
+  corresponding modes fall by 0.3–0.9 %. The common level rests on the archived E1 = 56 000 MPa and on the mean
+  thickness. Neither was adjusted, and no adjustment is proposed here.
+- **The mass is 0.58 % below the record** (117.68 g against 118.37 g). No density correction was made, as instructed.
+- **Not a material property and not an identified thickness.** E2 = 41 000 MPa writes a bending stiffness ratio in a
+  homogeneous shell (§25.8). The wedge is the archived linear field between two edge means; the interior thickness
+  is not measured (§13, §19). `NOT_A_MATERIAL_PROPERTY`; D-077 stands; no value is released.
+- **Stiffness and thickness are not separable by frequencies.** A frequency gives D = E h³ / 12 (1 − ν12 ν21) per
+  direction and place. A gradient of the modulus along X would act like the thickness gradient. The shapes of
+  records 7 and 8 show a break of the symmetry about the X centre line of this size; they do not show that its
+  cause is thickness.
+- **One model.** Neither the gradient nor the ratio was varied, so nothing is known from a solve about how sharply
+  the records select them. The field of the 20 readings (§19) was not combined, as instructed.
+- **Records 7 and 8: correspondence by position, not by a tracked branch** (§26.6).
+- **The direction of the wedge** follows the edge readings under placement D, which is a convention
+  (`CONVENTION_ONLY`). §18 found record 7 at 0.45 with the opposite orientation (old positions; a superseded value). That comparison
+  used MAC and was not used to choose the orientation here.
+- **The mapping.** Frequencies and FE-to-FE tracking do not depend on the point positions; every research MAC does.
+  The positions are instrument-derived for 261016 and used for 261027 on the owner's statement.
+  `PHYSICAL_REGISTRATION_NOT_VERIFIED`, D-044 and SPEC §5.2 stand.
+- **The experiment.** One force reference, no repeat of the setup, no uncertainty of the poles (§22.9). Session
+  261016 gives another order-1 ratio (§22.7).
+- **Unmodelled:** suspension, force sensor, layup, initial curvature.
+- **Not done:** a second solve or a retry, any parameter adjustment, a new thickness distribution, a density
+  correction, an orientation or geometry selection by MAC, LM, Auto-ID, a registration.
+
+**Assessment.** The combined hypothesis improves the model where §25 left the shapes of the group FE 13–16
+unexplained, and it shows that the two effects interact. It is **not an overall improvement on the criteria as
+declared**: the frequencies are slightly worse, one record is outside ± 5 %, and records 3 and 4 are unchanged. It
+remains a model-form hypothesis for one plate in one setup.
+
+### 26.9 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `0809f9c3…` and a clean tracked tree before the edit |
+| Input hashes | 66 inputs equal their recorded hashes (baseline package, archived wedge INP, the §25 input, the results and arrays of §22, §24 and §25, the protocol, the 36 own files); all unchanged in size, mtime and SHA-256 after the run |
+| Exact model differences | §26.1 |
+| Thickness orientation | §26.1 |
+| Integrated mass | §26.1 |
+| Solver completion, extraction integrity | §26.3 |
+| Branch and subspace tracking | §26.6 |
+| Expectation and criteria fixed before the solve | §26.2; the protocol hash is checked at every run |
+| MAC reproduction | the three existing states reproduce the stored matrices of §24 and §25 (difference 0.0) |
+| Reproducibility | two complete analysis runs give byte-identical `results.json` (`d539459f…`) and `arrays.npz` (`aaf488ca…`) |
+| Tests | `research/m11_r65`: 29 OK. `tests.test_plate_study`: 30 OK. `tests.test_psv_video_registration`: 22 OK. `tests.test_physical_registration`: 24 OK. `tests.test_plate_registration_readiness`: 18 OK. `tests.test_plate_rc1_owner_clarification`: 12 OK. `tests.test_plate_physical_review`: 36 OK. Run one at a time |
+
+Changed in the repository: this report only.
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_COMBINED_MODEL_01` (outside git): `build_inp.py`,
+`inp_record.json`, `expect.py`, `expectation.json`, `write_protocol.py`, `protocol.json`, `solve\` (INP, `.dat`,
+`.odb`, `.sta`, `.msg`, logs), `scripts\extract_odb.py`, `logs\`, `extraction\`, `identity.json`, `run_combined.py`,
+`results.json`, `arrays.npz`, `report.py`, `fig_four_models.png`, `fig_mac_four_states.png`,
+`fig_shapes_exp_3_4_7_8.png`.
 
 ## Not changed
 
