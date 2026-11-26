@@ -1,9 +1,10 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24; the prospective directional stiffness test of §22.8 solved with one owner-authorised Abaqus solve and one ODB extraction, all three criteria met, 2026-11-26, see §25). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No LM, parameter fit
-or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in two sections: one ODB
-extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction (§19). §1–§17 and
+or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in three sections: one ODB
+extraction of an archived result (§18), one eigenfrequency solve with one ODB extraction (§19), and one eigenfrequency
+solve with one ODB extraction (§25). §1–§17 and
 §20–§24 ran no Abaqus; §21 reads experimental files only, §23 reads instrument records only, the others read
 existing FE results. §24 is the only section that changes program code (`src/services/psv_video_registration.py`).
 
@@ -2323,6 +2324,8 @@ discrepancies of records 5, 6, 10 and 11 are, by the indication of §22.4, mainl
 
 ### 22.8 One proposed FE test (prepared, not executed)
 
+> **Executed (§25, 2026-11-26):** the test was solved once under the owner's authorisation. Criteria 1, 2 and 3 are met. The text below is kept as written before the solve.
+
 **Model.** `S4R_0875_BASELINE` with one changed constant: **E2 = 41 000 MPa**; E1 = 56 000 MPa, G12 = 5 000 MPa,
 ν12 = 0.05, thickness 0.875 mm, density, mesh and free-free conditions unchanged. One eigenfrequency solve and one
 ODB extraction, each needing a separate owner authorisation.
@@ -2941,6 +2944,8 @@ ratio, records 3, 4 and 7 need something else, and no value is released.
 
 ### 24.8 The proposed test, and the recommendation for the next FE step
 
+> **Executed (§25, 2026-11-26):** the test was solved once under the owner's authorisation. Criteria 1, 2 and 3 are met. The text below is kept as written before the solve.
+
 - **Recommendation: the one test of §22.8, unchanged.** `S4R_0875_BASELINE` with E2 = 41 000 MPa; one
   eigenfrequency solve and one ODB extraction, each under a separate owner authorisation. The value comes from the
   experimental frequencies and the plan alone and does not depend on the point positions.
@@ -2979,7 +2984,7 @@ section now carries a note that points here.
    positions for research; any program function that reads that file still reads the old positions.
 3. **The 261027 window.** Its size (279 or 287 mm) and offsets stay unrecorded. This section shows that the open
    3 % does not change a conclusion; it does not close the question.
-4. **Authorisation of the E2 = 41 000 MPa solve and extraction.**
+4. **Authorisation of the E2 = 41 000 MPa solve and extraction.** (Given on 2026-11-26; see §25.)
 
 ### 24.10 Limitations
 
@@ -2991,8 +2996,8 @@ section now carries a note that points here.
   where the file does not decide (§24.1).
 - The bottom plate edge of the 261016 frame still needs M11 deviation 3. The positions are uncertain at 1–3 mm
   (§23.6); the scenarios of §24.3 cover ± 3 mm and 0.87°.
-- The expectation for E2 = 41 000 MPa is not a solve. Suspension, force sensor and interior thickness remain
-  unmodelled (§20.4).
+- The expectation for E2 = 41 000 MPa is not a solve (**solved in §25; the expectation is confirmed**). Suspension, force
+  sensor and interior thickness remain unmodelled (§20.4).
 - Labels and MAC values are research quantities. No pairing status and no parameter value follows from them.
 
 ### 24.11 Verification and files
@@ -3018,6 +3023,325 @@ and this report.
 `protocol.json`, `results.json`, `arrays.npz`, `report.py`, `tables.md`, `legacy_equivalence.py`,
 `fig_mac_baseline_before_after.png`, `fig_first_ranked_all_models.png`, `fig_point_geometries.png`,
 `fig_frequency_error_first_ranked.png`.
+
+## 25. PLATE-0875-DIRECTIONAL-FE-TEST-01 — the prospective test of §22.8 solved: E2 = 41 000 MPa (2026-11-26)
+
+`RESEARCH_ONLY`, `PHYSICAL_REGISTRATION_NOT_VERIFIED`, `NOT_A_MATERIAL_PROPERTY`. One isolated numerical test of the
+directional bending stiffness hypothesis. It is not a material identification: no parameter was fitted, no LM or
+Auto-ID was run, no value is released, no pairing status and no `FrozenRegistration` were produced. The
+identification pipeline is unchanged and still has E1 = E2. M8 GATE NOT_MET, D-077 `NO_GLOBAL_PARAMETER_VALUE` and
+production Auto-ID BLOCKED are unchanged. No program code, test, registration, gate or tool was changed.
+
+**Abaqus use (owner authorisation: exactly one solve and one corresponding extraction).**
+
+| Action | Count | Detail |
+|---|---|---|
+| Abaqus solves | **1** | `CFRP_S4R_0875_E2_41000_FreeFree`, Abaqus/Standard 2024, cpus = 1, interactive; 2026-11-26 15:13:42, 12.6 s, exit 0; no retry |
+| ODB extractions | **1** | pinned extractor `039aa067…`, modes 1–20; 15:14:02, 5.4 s, exit 0; the ODB is unchanged by it; no retry |
+
+**Short answer.** All three prospective criteria of §22.8 are met.
+
+| Criterion (§22.8, written before the solve) | Result | Verdict |
+|---|---|---|
+| 1. Class sequence of FE 7–17 | AA, SS (Y1), SS (X1), AS, SA, SS, SA (Y2), AA, AS (X2), AA, SA — the required sequence | **PASS** |
+| 2. FE mode of the class order within ± 5 % of each of the 11 records | largest error 4.38 % (record 2); mean 2.29 %; no record outside | **PASS** |
+| 3. Solved frequencies of FE 7–18 within 1 % of the reduced-basis expectation | largest difference 0.049 % | **PASS** |
+
+- **Frequencies.** With E2 = 41 000 MPa the mean error of the class-order modes falls from 6.2 % (baseline, largest
+  15.5 %) to 2.3 % (largest 4.4 %).
+- **Shapes.** The predicted separation of the mixed pairs occurs: records 2, 8 and 10 rise from 0.52, 0.43 and 0.57
+  to 0.97, 0.81 and 0.97. Eight records are at 0.81–0.99.
+- **Not explained.** Records 3, 4 and 7 stay at 0.68, 0.56 and 0.79, exactly as expected. A single stiffness ratio
+  does not describe their shapes.
+- **What the solve adds.** It confirms the reduced-basis expectation of §22.8 / §24.8 (frequencies to 0.05 %,
+  research MAC to 0.0004). It gives no comparison with the experiment that §24 did not already predict.
+- **What it does not show.** The cause of the ratio, a value of E1 or E2, or a pairing. Passing the test means that
+  one bending stiffness ratio describes the 11 frequencies of this plate in the 261027 setup within ± 5 %.
+
+### 25.1 The model and the single change
+
+| Item | Value |
+|---|---|
+| Base | `S4R_0875_BASELINE`, `CFRP_S4R_0875_FreeFree.inp`, SHA-256 `962f75f2…` (= `research/m11_r65/expected_inputs.json`), read only |
+| Test input | `CFRP_S4R_0875_E2_41000_FreeFree.inp`, SHA-256 `bab9b7ed…`, written before the solve |
+| Difference | one line of 20 264, line 20239: `56000.,56000., 8500., …` → `56000.,41000., 8500., …`; equal byte length; every other byte identical |
+| Parsed constants | E1 = 56 000, **E2 = 41 000**, E3 = 8 500, ν12 = 0.05, ν13 = ν23 = 0.3, G12 = 5 000, G13 = G23 = 3 000 MPa; only E2 differs from the baseline |
+| Unchanged | mesh (10 201 nodes, 10 000 S4R), thickness 0.875 mm, density, free-free conditions, step, 20 requested modes |
+| Mass | 118.361 g in the `.dat`, equal to the baseline; centre of mass (150.5, 150.0, 0) |
+
+The criteria, the expectation and the geometry for the research MAC were written to `protocol.json`
+(`e1b6b9db…`) before the solve. Nothing in it was edited afterwards.
+
+### 25.2 Solver completion and extraction integrity
+
+| Check | Result |
+|---|---|
+| Solve | "THE ANALYSIS HAS COMPLETED SUCCESSFULLY" in `.sta`; `JOB … COMPLETED` in the console log; exit 0 |
+| Messages | 0 errors and 0 warnings in `.dat`; `.msg`: 0 warning messages, 0 error messages |
+| Rigid modes | modes 1–6 below 0.01 Hz; no non-positive eigenvalue among modes 7–20 |
+| Extraction | exit 0; 22 files (geometry, manifest, 20 modes); 20 "Extracted mode" lines; 10 201 nodes |
+| ODB | SHA-256 `4e0f4ef2…` before and after the extraction |
+| Frequencies | manifest = `.dat` for modes 7–20 (relative difference 0.0) |
+| Geometry | node labels, coordinates and connectivity equal the baseline package; INP nodes reproduce the extracted geometry to 1.5·10⁻⁵ mm |
+| Field | in-plane displacement / U3 at most 1.5·10⁻¹¹ |
+
+`.dat` `efcde38b…`, manifest `179a6ef3…`. The 30 solve and extraction files were hashed once after the extraction
+(`identity.json`) and are verified at every analysis run.
+
+### 25.3 Actual against predicted frequencies
+
+Whole-plate class as in §22 (parity about the two centre lines; a one-direction class where the share is 0.70 or
+more). "Expected" is the reduced-basis value of §22.8.
+
+| FE mode | Solved, Hz | Expected, Hz | Solved − expected | Shape MAC, solved / expected | Class on the whole plate | Baseline branch |
+|---|---|---|---|---|---|---|
+| 7 | 19.018 | 19.019 | −0.006 % | 1.0000 | AA | FE 7 |
+| 8 | 52.229 | 52.230 | −0.001 % | 1.0000 | SS, **Y1** | FE 8 and 9 in equal parts |
+| 9 | 60.811 | 60.811 | 0.000 % | 1.0000 | SS, **X1** | FE 8 and 9 in equal parts |
+| 10 | 64.817 | 64.834 | −0.027 % | 1.0000 | AS | FE 11 |
+| 11 | 71.711 | 71.714 | −0.004 % | 1.0000 | SA | FE 10 |
+| 12 | 111.79 | 111.845 | −0.049 % | 0.9999 | SS | FE 12 |
+| 13 | 144.26 | 144.249 | +0.007 % | 1.0000 | SA, **Y2** | FE 14 |
+| 14 | 154.71 | 154.722 | −0.008 % | 1.0000 | AA | FE 15 and 16 in equal parts |
+| 15 | 167.45 | 167.451 | −0.001 % | 1.0000 | AS, **X2** | FE 13 |
+| 16 | 176.83 | 176.834 | −0.002 % | 1.0000 | AA | FE 15 and 16 in equal parts |
+| 17 | 194.82 | 194.898 | −0.040 % | 0.9999 | SA | FE 18 |
+| 18 | 210.07 | 210.155 | −0.040 % | 0.9997 | AS | FE 17 |
+| 19 | 281.38 | 281.506 | −0.045 % | 0.9998 | AA | FE 19 |
+| 20 | 282.86 | (321.083) | (−11.9 %) | (0.17) | SS | not in the baseline FE 7–20 |
+
+- **Criterion 3: PASS.** The largest difference for FE 7–18 is 0.049 %, against the limit of 1 %. The reduced basis
+  is valid at this step, which is larger than any archived one (E2 −27 %).
+- **FE 20 is outside the criterion,** as §22.8 stated. The solved FE 20 (282.86 Hz, SS) lies 83 % outside the span
+  of the 14 baseline shapes: it is a mode that the baseline has above its FE 20, and a 14-shape basis cannot contain
+  it. It is above every record and enters no result.
+- The `.dat` and the manifest give five significant digits; the differences are at that resolution.
+
+### 25.4 Whole-plate classes (criterion 1) and branch tracking
+
+**Criterion 1: PASS.** The parity classes of the solved FE 7–17 in ascending frequency are AA, SS, SS, AS, SA, SS,
+SA, AA, AS, AA, SA, with FE 8 = Y1, FE 9 = X1, FE 13 = Y2 and FE 15 = X2. This is the required sequence, and the
+sequence of the 11 records. The smallest parity share of a mode is 1.000: a homogeneous material keeps the classes
+apart. The class of each mode seen in the corrected scan window equals its whole-plate class for all 14 modes.
+
+**Tracking against the baseline** (FE-to-FE real MAC of U3 on all 10 201 nodes, assignment as in §20; tracked at
+0.90 or more):
+
+| Baseline | Hz | Class | Solved | Hz | MAC | Status | Frequency change |
+|---|---|---|---|---|---|---|---|
+| 7 | 19.07 | AA | 7 | 19.02 | 1.00 | tracked | −0.3 % |
+| 8 | 59.87 | SS | 8 | 52.23 | 0.50 | lost | (−12.8 %) |
+| 9 | 62.01 | SS | 9 | 60.81 | 0.50 | lost | (−1.9 %) |
+| 10 | 71.85 | SA | 11 | 71.71 | 1.00 | tracked | −0.2 % |
+| 11 | 72.19 | AS | 10 | 64.82 | 1.00 | tracked | −10.2 % |
+| 12 | 116.58 | SS | 12 | 111.79 | 1.00 | tracked | −4.1 % |
+| 13 | 167.49 | AS | 15 | 167.45 | 1.00 | tracked | −0.0 % |
+| 14 | 168.61 | SA | 13 | 144.26 | 1.00 | tracked | −14.4 % |
+| 15 | 174.80 | AA | 16 | 176.83 | 0.51 | lost | (+1.2 %) |
+| 16 | 179.90 | AA | 14 | 154.71 | 0.51 | lost | (−14.0 %) |
+| 17 | 213.20 | AS | 18 | 210.07 | 1.00 | tracked | −1.5 % |
+| 18 | 213.95 | SA | 17 | 194.82 | 1.00 | tracked | −8.9 % |
+| 19 | 295.78 | AA | 19 | 281.38 | 1.00 | tracked | −4.9 % |
+| 20 | 327.90 | SS | — | — | 0.17 | lost | — |
+
+- **9 of 14 branches tracked,** each with MAC 1.00 and none with a changed class. The branches governed by
+  curvature along FE Y fall by 8.9–14.4 % (FE 11, 14, 18; √(41 / 56) = 0.856 is −14.4 %). Those governed by
+  curvature along FE X and the twist stay within 0.3 % (FE 7, 10, 13). FE 12, 17 and 19 lie between (−1.5 to −4.9 %).
+- **Lost: 8, 9, 15, 16 and 20,** the same five as in every archived model with E1 ≠ E2 (§20.1). Each solved mode of
+  the pairs is an equal mixture of the two baseline modes (0.50 / 0.50 and 0.49 / 0.51), so no branch can be
+  followed individually. The two-mode subspaces are kept: the largest principal angle to the baseline pair is 0.17°
+  (FE 8 / 9) and 0.72° (FE 14 / 16). The bracketed frequency changes of lost branches are not branch quantities.
+- **Order exchanges:** 10 ↔ 11, 17 ↔ 18, and 14 → 13 with 13 → 15. In each close pair the Y-governed mode is now the
+  lower one, as predicted.
+- **Close modes.** The baseline has four close pairs among FE 7–18 (10 / 11, 13 / 14, 15 / 16, 17 / 18). The solved
+  model has none: the only close group by the existing trigger is FE 19 / 20, above the records.
+
+### 25.5 Class frequencies (criterion 2) and the residuals
+
+The k-th record of a parity class against the k-th FE mode of that class (§22.6). No MAC and no frequency closeness
+enter the correspondence. In the solved model it is record k against FE 6 + k.
+
+| EXP | Hz | Class | FE mode | Solved, Hz | Error | Expected error (§22.8) | Baseline error (§22.6) | Role |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 18.63 | AA | 7 | 19.018 | +2.08 % | +2.1 % | +2.4 % | test |
+| 2 | 54.62 | SS | 8 | 52.229 | **−4.38 %** | −4.4 % | +9.6 % | gave the ratio |
+| 3 | 63.50 | SS | 9 | 60.811 | −4.23 % | −4.2 % | −2.3 % | gave the ratio |
+| 4 | 66.85 | AS | 10 | 64.817 | −3.04 % | −3.0 % | +8.0 % | test |
+| 5 | 74.21 | SA | 11 | 71.711 | −3.37 % | −3.4 % | −3.2 % | test |
+| 6 | 112.27 | SS | 12 | 111.79 | −0.42 % | −0.4 % | +3.8 % | test |
+| 7 | 145.94 | SA | 13 | 144.26 | −1.15 % | −1.2 % | +15.5 % | gave the ratio |
+| 8 | 157.85 | AA | 14 | 154.71 | −1.99 % | −2.0 % | +10.7 % | test |
+| 9 | 169.18 | AS | 15 | 167.45 | −1.03 % | −1.0 % | −1.0 % | gave the ratio |
+| 10 | 180.14 | AA | 16 | 176.83 | −1.84 % | −1.8 % | −0.1 % | test |
+| 11 | 191.60 | SA | 17 | 194.82 | +1.68 % | +1.7 % | +11.7 % | test |
+| Mean absolute | | | | | 2.29 % | | 6.22 % | |
+| Largest absolute | | | | | 4.38 % | | 15.54 % | |
+
+- **Criterion 2: PASS.** No record is outside ± 5 %. The seven test records: mean 2.06 %, largest 3.37 %
+  (record 5).
+- **The margin is small where it was expected to be small:** 0.62 % at record 2 and 0.77 % at record 3. Both are
+  records that gave the ratio. The ratio fixes how the Y-governed modes lie relative to the X-governed ones; it does
+  not fix the common level, which comes from the archived E1 = 56 000 MPa.
+- **A residual that the ratio does not remove.** The errors are small but not scattered about zero: the signed
+  mean is −1.6 %. The order-1 classes (records 2–5) are
+  3.0–4.4 % low, the order-2 classes (records 7–10) 1.0–2.0 % low, record 1 (twist) is 2.1 % high and record 11 is
+  1.7 % high. §22.7 named this residual between the orders before the solve. A stiffness ratio cannot change it.
+- **Both directions are now equal.** Y-governed records 2, 7, 8, 11: −4.4, −1.1, −2.0, +1.7 %. X-governed records
+  3, 5, 9, 10: −4.2, −3.4, −1.0, −1.8 %. The direction-dependent pattern of the baseline (§24.6) is gone.
+- **FE 18 (210.07 Hz, AS) has no record.** The stored response has no local maximum of 1 dB or more between 195 and
+  241 Hz (§22.7). Whether that mode was not excited or is not there is not known.
+- ± 5 % is the existing descriptive level. It is not a gate and no pairing follows from it.
+
+### 25.6 Research MAC with the corrected positions
+
+Geometry: `CORRECTED_261016` of §24 only (287.1 × 285.3 mm, from the instrument record of 261016; used for 261027 on
+the owner's statement that the same points were scanned). The superseded nominal positions were not used. Mapping,
+metric, levels and labels as in §17: placement D (`CONVENTION_ONLY`), bilinear sampling of U3, complex MAC. All 11
+records are kept.
+
+**Full matrix, solved model** (values below 0.005 shown as 0.00; bold: first-ranked):
+
+| EXP | FE 7 | FE 8 | FE 9 | FE 10 | FE 11 | FE 12 | FE 13 | FE 14 | FE 15 | FE 16 | FE 17 | FE 18 | FE 19 | FE 20 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | **0.97** | 0.00 | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 2 | 0.00 | **0.97** | 0.00 | 0.02 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 3 | 0.00 | 0.02 | **0.68** | 0.26 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 4 | 0.00 | 0.01 | 0.41 | **0.56** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 5 | 0.00 | 0.00 | 0.00 | 0.00 | **0.99** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 6 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.99** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 7 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.79** | 0.18 | 0.00 | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 8 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.17 | **0.81** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 9 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | **0.98** | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| 10 | 0.01 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 | 0.00 | **0.97** | 0.01 | 0.00 | 0.00 | 0.00 |
+| 11 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.01 | 0.00 | 0.01 | 0.01 | **0.96** | 0.01 | 0.00 | 0.00 |
+
+**First-ranked mode of each record:**
+
+| EXP | Hz | Baseline (§24.3) | Expected (§24.8) | **Solved** | Solved first-ranked FE mode | Frequency error | Range over the 59 scenarios | Share in the four-mode group |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 18.63 | 0.97 | 0.97 | **0.97** | 7 | +2.1 % | 0.96–0.97 | — |
+| 2 | 54.62 | 0.52 | 0.97 | **0.97** | 8 | −4.4 % | 0.96–0.97 | 0.99 (FE 8–11) |
+| 3 | 63.50 | 0.45 | 0.68 | 0.68 | 9 | −4.2 % | 0.67–0.68 | 0.96 (FE 8–11) |
+| 4 | 66.85 | 0.56 | 0.56 | 0.56 | 10 | −3.0 % | 0.55–0.56 | 0.98 (FE 8–11) |
+| 5 | 74.21 | 0.99 | 0.99 | **0.99** | 11 | −3.4 % | 0.97–0.99 | 0.99 (FE 8–11) |
+| 6 | 112.27 | 0.99 | 0.99 | **0.99** | 12 | −0.4 % | 0.97–0.99 | — |
+| 7 | 145.94 | 0.79 | 0.79 | 0.79 | 13 | −1.2 % | 0.77–0.79 | 0.98 (FE 13–16) |
+| 8 | 157.85 | 0.43 | 0.81 | **0.81** | 14 | −2.0 % | 0.76–0.83 | 0.97 (FE 13–16) |
+| 9 | 169.18 | 0.98 | 0.98 | **0.98** | 15 | −1.0 % | 0.96–0.98 | 0.98 (FE 13–16) |
+| 10 | 180.14 | 0.57 | 0.97 | **0.97** | 16 | −1.8 % | 0.95–0.97 | 0.98 (FE 13–16) |
+| 11 | 191.60 | 0.96 | 0.96 | **0.96** | 17 | +1.7 % | 0.92–0.97 | — |
+| Mean | | 0.75 | 0.88 | **0.88** | | 2.3 % (absolute) | | |
+
+- **The first-ranked mode of every record is the mode of its class order: 11 of 11.** In the baseline it is 7 of 11
+  (§24.7). The first rank uses no class and the class order uses no MAC. In the solved model the first-ranked mode
+  is also the one that follows the experimental order: record k with FE 6 + k.
+- **Eight records at 0.80 or above** (1, 2, 5, 6, 8, 9, 10, 11), five in the baseline. All 11 are at 0.50 or above
+  (nine in the baseline). Mean frequency error of the first-ranked modes: 2.3 %, against 6.9 % in the baseline over
+  its nine records at 0.50 or above.
+- **Solved against expected:** the largest difference of any matrix element is 0.0004. The research MAC of §24.8
+  was a correct prediction of the solve.
+- **Stability.** In all 59 declared shift and rotation scenarios the first-ranked mode of every record is
+  unchanged. The widest range is 0.76–0.83 (record 8), which crosses 0.80.
+- **Span.** Every record lies 0.96–1.00 in the span of the 14 solved shapes, as in the baseline (0.96–1.00): the
+  solved shapes span the same space, differently combined.
+- **Labels by the unchanged rule of §17:** records 1 and 6 `CANDIDATE_ONLY`; 3, 4 and 7 `WEAK_CANDIDATE`; 2, 5, 8,
+  9, 10 and 11 `AMBIGUOUS_CLUSTER`. The last label is given because the rule tests the share in the two-mode
+  subspaces of the baseline pairs, and a mode with MAC ≥ 0.80 that belongs to such a pair always passes it. In the
+  solved model these pairs are no longer close in frequency (§25.4). The rule was not changed. A label is a research
+  quantity; no pairing status follows.
+
+### 25.7 Does the predicted separation of the mixed modes occur?
+
+**Yes.** §24.8 stated the check before the solve: if records 2 and 10 stayed near their baseline values, the reduced
+basis would be wrong about the pair separation, whatever the frequencies did.
+
+| EXP | Pair in the baseline | Baseline | Expected | Solved | Solved − expected |
+|---|---|---|---|---|---|
+| 2 | FE 8 / 9 | 0.52 | 0.970 | 0.970 | −0.000004 |
+| 8 | FE 15 / 16 | 0.43 | 0.807 | 0.807 | +0.00006 |
+| 10 | FE 15 / 16 | 0.57 | 0.968 | 0.969 | +0.00003 |
+
+- **FE 8 / 9.** The solved FE 8 is Y1 and FE 9 is X1 (one-direction share 0.99 each); in the baseline each of the
+  two modes is a combination of both. Record 2 is Y1 (§21.5) and takes FE 8 at 0.97.
+- **FE 14 / 16.** The baseline pair FE 15 / 16 separates into two AA modes at 154.71 and 176.83 Hz, on either side
+  of X2 (22 Hz apart; 5 Hz in the baseline). By the energy shares of the reduced basis (§22.8), whose shapes equal
+  the solved ones at MAC 1.0000, the lower is Y-governed and the upper X-governed. Records 8 and 10 take them at
+  0.81 and 0.97.
+- **Not separated by this model, as expected (§22.8, §24.7):**
+  - Records 3 and 4 (0.68 and 0.56). Each has a second FE mode at 0.26 and 0.41: record 3 with FE 9 (SS) and FE 10
+    (AS), record 4 with FE 10 and FE 9. Both lie 0.96 and 0.98 inside the span of FE 8–11. They mix the classes SS
+    and AS, which a homogeneous orthotropic plate keeps apart.
+  - Records 7 and 8 share FE 13 (SA) and FE 14 (AA) at 0.79 / 0.18 and 0.17 / 0.81.
+  - In both cases the parity about one centre line is broken. The thickness models bring record 7 to 0.96 (§24.4).
+    That remains a separate hypothesis, and this task makes no combined model.
+
+### 25.8 What the result means, and its limitations
+
+**Established by this task (verified computation):**
+
+1. The hypothesis in the form of §22.8 survives its three prospective falsification criteria.
+2. One bending stiffness ratio D11 / D22 = 56 / 41 = 1.366 in the existing shell model gives the experimental class
+   sequence and the 11 class frequencies within 4.4 %.
+3. With it, the first-ranked FE mode of every record is the mode of its class order, and eight of the 11 shapes
+   agree at 0.81–0.99 with the corrected positions.
+4. The reduced basis of §22.8 predicts a solve at this step to 0.05 % in frequency and 0.0004 in research MAC.
+
+**Not established, and remaining limitations:**
+
+- **Not a material property.** A frequency gives a bending stiffness per direction, D = E h³ / 12 (1 − ν12 ν21), not
+  E (§20.3). "E2 = 41 000 MPa" is a way of writing the ratio in a homogeneous shell of 0.875 mm.
+  `NOT_A_MATERIAL_PROPERTY`; D-077 stands and no value is released.
+- **The cause is not identified.** A laminate with equal in-plane moduli can have different bending stiffnesses in
+  two directions through its stacking sequence. The layup is not recorded (§15). Initial curvature and the
+  suspension are not excluded. The frequencies do not separate these.
+- **The value was not fitted, but it was taken from four of the 11 records** (2, 3, 7 and 9). For those the test of
+  the ratio is weak by construction; the seven others are the test. The common level rests on the archived
+  E1 = 56 000 MPa.
+- **One model, one value.** No neighbouring ratio was solved, so nothing is known from a solve about how sharply the
+  criteria select 1.366. The archived E2 −5 % and −10 % models show the same direction of change (§24.7).
+- **Three shapes are not described:** records 3, 4 and 7. The model keeps the parity classes apart and these records
+  mix them.
+- **A residual of 3 % between the orders remains** (§25.5), and the margin of criterion 2 is 0.62 % at record 2.
+- **Session 261016** gives another order-1 ratio (0.811 against 0.860, §22.7). The ratio is not shown to be a
+  constant of the specimen.
+- **The mapping.** The class sequence and the frequencies (criteria 1–3) do not depend on the point positions. Every
+  MAC does: the positions are instrument-derived for 261016 and used for 261027 on the owner's statement; placement
+  D is a convention. `PHYSICAL_REGISTRATION_NOT_VERIFIED`, D-044 and SPEC §5.2 (no traceable material axes) stand.
+- **The direction.** "E2 is the lower one" is "the bending stiffness for curvature along FE Y is the lower one"
+  under placement D (`CONVENTION_ONLY`, §22.2). It is not tied to a physical axis of the plate.
+- **The experiment.** One force reference, no repeat of the setup and no uncertainty of the poles (§22.9). FE 18 has
+  no record (§25.5).
+- **Unmodelled:** suspension, force sensor, interior thickness (§20.4).
+- **Not done:** a second solve or a retry, any other parameter change, a combined thickness and stiffness model, LM,
+  Auto-ID, enabling E1 ≠ E2 in the identification pipeline, a registration.
+
+**Verdict.** The directional stiffness hypothesis passed the one test that was written for it before the solve. It
+is the only model examined so far that reproduces the class sequence and all 11 frequencies. It remains a
+description of this plate in one setup by one number of a homogeneous shell: **not a confirmed cause, not a material
+value, and not a basis for a parameter release.**
+
+### 25.9 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `2d521588…` and a clean tracked tree before the edit |
+| Input hashes | 58 inputs equal their recorded hashes (baseline package, test INP, protocol, extractor, the results and arrays of §22 and §24, the 30 solve and extraction files); all unchanged in size, mtime and SHA-256 after the run |
+| Single-parameter change | §25.1: one line, one constant, equal byte length |
+| Solver completion | §25.2 |
+| Extraction integrity | §25.2 |
+| Branch tracking | §25.4 |
+| Prospective criteria | 1 PASS, 2 PASS, 3 PASS (§25.3–§25.5) |
+| Protocol | the expectation used here equals the one stored in `protocol.json` before the solve |
+| MAC reproduction | with the same code path the baseline and the expectation reproduce the stored matrices of §24 (difference 0.0) |
+| Reproducibility | two complete analysis runs give byte-identical `results.json` (`f047f833…`) and `arrays.npz` (`8be92ee0…`) |
+| Tests | `research/m11_r65`: 29 OK. `tests.test_plate_study`: 30 OK. `tests.test_psv_video_registration`: 22 OK. `tests.test_physical_registration`: 24 OK. `tests.test_plate_registration_readiness`: 18 OK. `tests.test_plate_rc1_owner_clarification`: 12 OK. `tests.test_plate_physical_review`: 36 OK. Run one at a time |
+
+Changed in the repository: this report only.
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_DIRECTIONAL_FE_TEST_01` (outside git): `prepare.py`,
+`protocol.json`, `solve\` (INP, `.dat`, `.odb`, `.sta`, `.msg`, logs), `scripts\extract_odb.py`, `logs\`,
+`extraction\` (manifest, geometry, 20 modes), `identity.json`, `run_test.py`, `results.json`, `arrays.npz`,
+`report.py`, `fig_frequency_error_class_order.png`, `fig_mac_matrix_solved.png`, `fig_shapes_exp_vs_fe.png`.
 
 ## Not changed
 
