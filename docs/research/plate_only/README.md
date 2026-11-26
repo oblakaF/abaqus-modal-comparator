@@ -1,13 +1,13 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24; the prospective directional stiffness test of §22.8 solved with one owner-authorised Abaqus solve and one ODB extraction, all three criteria met, 2026-11-26, see §25; the combined model with the wedge thickness of §18 and the stiffness ratio of §25, one owner-authorised Abaqus solve and one ODB extraction, record 7 explained, records 3 and 4 not, one record outside ± 5 %, 2026-11-26, see §26; the instrument-metadata scan normalisation made the default of new reconstructions in the service and the tool, the earlier reading kept by explicit selection only, and the corrected plate reconstruction written under its own name, 2026-11-26, see §27). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24; the prospective directional stiffness test of §22.8 solved with one owner-authorised Abaqus solve and one ODB extraction, all three criteria met, 2026-11-26, see §25; the combined model with the wedge thickness of §18 and the stiffness ratio of §25, one owner-authorised Abaqus solve and one ODB extraction, record 7 explained, records 3 and 4 not, one record outside ± 5 %, 2026-11-26, see §26; the instrument-metadata scan normalisation made the default of new reconstructions in the service and the tool, the earlier reading kept by explicit selection only, and the corrected plate reconstruction written under its own name, 2026-11-26, see §27; the four models of §24–§26 shown in the Research Results page from one separate hash-verified snapshot, the PRIORITY-1–4 plate tables named historical, 2026-11-26, see §28). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No LM, parameter fit
 or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in four sections: one ODB
 extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction in each of §19, §25
 and §26. §1–§17 and
 §20–§24 ran no Abaqus; §21 reads experimental files only, §23 reads instrument records only, the others read
-existing FE results. §24 and §27 are the only sections that change program code (`src/services/psv_video_registration.py`; in §27 also
-`tools/reconstruct_psv_registration.py`).
+existing FE results. §24, §27 and §28 are the only sections that change program code (`src/services/psv_video_registration.py`; in §27 also
+`tools/reconstruct_psv_registration.py`; in §28 the Research Results reader, model and page).
 
 - **Scope (owner).** The sandwich panels are set aside. One specimen is studied: `PLATE-300x300x1mm`, series
   `NEXP29/PLATE300-1MM/S261027-ROTATED`.
@@ -3896,6 +3896,138 @@ Changed in the repository: `src/services/psv_video_registration.py`, `tools/reco
 
 `D:\git\abaqus-modal-comparator-work\research\PSV_NORMALIZATION_INTEGRATION_01` (outside git): `generate.py`,
 `provenance.json`, the two reconstruction files of §27.2, `base_module\`, `tests.log`.
+
+## 28. PLATE-0875-CURRENT-RESEARCH-VIEW-01 — the corrected plate results in the Research Results page (2026-11-26)
+
+`RESEARCH_ONLY`, `PHYSICAL_REGISTRATION_NOT_VERIFIED`, `NOT_A_MATERIAL_PROPERTY`. A display task: no Abaqus, no
+extraction, no fit, no new number. No historical snapshot, registration, passport, gate or decision was changed, and
+nothing of SP-02, SP-13 or SP-10. M8 GATE NOT_MET, D-077 `NO_GLOBAL_PARAMETER_VALUE` and production Auto-ID BLOCKED
+are unchanged.
+
+**Short answer.** The Research Results page now begins, for PLATE, with the four models of §24–§26 read from one
+separate, hash-verified snapshot. The PRIORITY-1–4 plate tables follow it, unchanged and named historical.
+**The page is not part of the program that `RUN_PROGRAM.cmd` starts:** that program has five pages and no Research
+Results. The view was checked in the research window (`python -m new_gui --research`). Whether and how the normal
+program offers it is an owner decision outside this task (§28.4).
+
+### 28.1 The snapshot
+
+`docs/research/plate_only/plate_comparison_261027.json` (39.6 kB; SHA-256 of the committed content `dc2ac694…`).
+
+- **Built only from stored results:** `results.json` of §24 (`87b8e042…`), §25 (`f047f833…`) and §26
+  (`d539459f…`), the two protocols written before the solves, and the corrected reconstruction of §27
+  (`8047872a…`). Each was verified by its hash when the snapshot was built; the snapshot lists them. Values are
+  copied, with MAC and errors rounded to six decimals. Nothing is computed from shapes.
+- **Content:** the four models with their FE inputs and file hashes; the 11 experimental frequencies; FE7–FE20 of
+  each model; per record the corresponding FE mode, its frequency, the error, the research MAC, the first-ranked FE
+  mode and its range over the 59 scenarios; the four 11 × 14 research MAC matrices; the summary of each model; the
+  corrected and the superseded scan window; the conditional transfer from 261016 to 261027; the criteria of §25 and
+  §26 with their verdicts; the branch tracking of §26.6; the limitations.
+- **Separate.** It lies beside this report, not with the registration evidence. It is not among the eight files of
+  the historical snapshot (`SNAPSHOT_FILES`, unchanged). Only `services/research_results_reader.py` reads it; no
+  identification, registration or pairing code does (tested).
+- **Read only when it is right.** The reader compares the SHA-256 with the recorded one, then checks the content
+  against itself: every frequency error is recomputed from the two frequencies, every first-ranked mode from its
+  matrix row, every summary value from the records. The ± 5 % verdict of the combined model, the unresolved records
+  and the lost branches must follow from the numbers, so they cannot be removed without a refusal. A refusal is
+  shown with its reason; nothing is put in its place.
+
+### 28.2 What the page shows
+
+For the specimen PLATE, in this order:
+
+**A. Current plate research results — corrected scan geometry.**
+
+| Part | Content |
+|---|---|
+| Status | the four labels; "display only: not registration evidence, not an identification input, not a pairing record"; the unchanged gates |
+| Identity | the snapshot path and SHA-256, the series and its experimental SHA-256, the six source results |
+| Scan geometry | corrected window 287.1 × 285.3 mm with the four gaps; placement D (`CONVENTION_ONLY`); **transfer 261016 → 261027: CONDITIONAL**, on the owner's statement; the superseded 215.4 × 285.2 mm |
+| The four FE models | thickness, E1, E2, G12, ν12, mass, FE input SHA-256, origin of the FE result |
+| Summary | mean research MAC, records at 0.80 or above, records below, first-ranked = corresponding, mean and largest error, records outside ± 5 % |
+| Frequencies | all 11 records × four models: corresponding FE mode, its frequency, Δf %; cells outside ± 5 % marked |
+| Research MAC | all 11 records × four models: first-ranked FE mode and its MAC; a note per record |
+| One model in full | four buttons (none preferred; the page opens on the baseline): the 11 records of the model and its 11 × 14 matrix as a heat map |
+| Criteria | the three passed criteria of §25; **the failed ± 5 % criterion of the combined model (EXP 2, −5.26 %)**; EXP 3 and EXP 4 not improved; the non-additive records |
+| Branch tracking | 14 rows, combined against directional only; **FE 13, FE 14 and FE 20 shown as LOST**, "not replaced by another mode" |
+| Limitations | **EXP 3 and EXP 4 unresolved**; the failed criterion; the lost branches of EXP 7 and EXP 8; the conditional mapping; no pairing, no value |
+
+**B. Historical PRIORITY-1–4 plate results — superseded scan geometry.** The archived tables are shown as before,
+each under a red note that begins "HISTORICAL":
+
+| Historical part | Note |
+|---|---|
+| Mode matching table (research MAC, statuses, reasons) | computed with the 215.4 mm window; positions wrong along FE X by up to 49.3 mm; not a current result |
+| Local research MAC matrix (a chosen `matching_record.json`) | the same note, shown whether or not a record is loaded; the historical matrix stays below it |
+| Inverse scenarios S0 / H1 / H2 | their assumed pairs came from the research MAC of the superseded geometry; their parameter sets and FE frequencies do not depend on the positions; with the corrected positions H1 leaves EXP 5 and EXP 9 12.0 % and 12.8 % too low (§24.6) |
+| FE parameter sensitivities | FE-only: stated as not affected |
+
+SP-13 and SP-10 show no plate card and no plate note; their content is unchanged.
+
+### 28.3 Tests
+
+`tests.test_priority5_research_results`: 26 tests (14 before; the 14 unchanged ones pass).
+
+| Required | Tests |
+|---|---|
+| Snapshot integrity | read with the recorded SHA-256 under LF and CRLF; one changed value, damaged JSON or a missing file is refused |
+| Source identity | the series' experimental SHA-256; the four FE input hashes of §18, §25.1, §26.1; the six source results on this machine have the recorded SHA-256; the snapshot is outside the historical snapshot and read by no other program code |
+| Four models, 11 records | inputs, 11 records and an 11 × 14 matrix per model; the summary values of §26.4; the rows the page shows |
+| Refusal of invalid data | 29 changed documents, among them: a model or a record removed, a non-finite or out-of-range MAC, an error that does not follow, the failed ± 5 % hidden or called PASS, the unresolved records dropped, a lost branch called tracked, the superseded geometry as basis, an unconditional transfer, use as evidence |
+| Historical warnings | the three notes begin "HISTORICAL" and name the superseded geometry; on the page each is present once for PLATE and absent for SP-13 and SP-10 |
+| Limits kept | EXP 3 / EXP 4 unresolved, EXP 2 outside ± 5 %, FE 13 / FE 14 lost, in the model rows and on the page |
+| Page | the card, its six tables and the heat map; the four buttons; a changed snapshot shows the refusal and no table, while the historical tables stay; opening the page starts no process |
+| Existing regression | the 14 earlier tests of this module and the modules of §28.5 |
+
+### 28.4 Windows check, and why it is not through `RUN_PROGRAM.cmd`
+
+| Run | Result |
+|---|---|
+| `RUN_PROGRAM.cmd` (the real launcher) | the program starts and closes (exit 0, no process left). Its window is `ProductionWindow` with the pages Analyze, Review, MAC / Points, Materials and Research Tuning. **There is no Research Results page, so the new view cannot be reached there** |
+| `.venv\Scripts\python.exe -m new_gui --research` with `PYTHONPATH=src` (what `RUN_NEW_GUI.cmd` runs, plus the option) | the research window (`MainWindow`) opens; Research Results is shown; section A with the snapshot SHA-256, the geometry, the four models, the tables and the heat map; the four model buttons each change the records and the matrix; the criteria, the tracking with the three LOST rows and the limitations; the three HISTORICAL notes; exit 0, no process left |
+
+- **Cause.** `new_gui/production_window.py` imports none of the earlier pages by design, `new_gui/__main__.py` opens
+  the research window only with `--research`, and `RUN_PROGRAM.cmd` refuses every option except `legacy`; a test
+  (`tests/test_working_draft_r1.py`) requires that the launcher does not name `--research`. All of these are outside
+  the allowed files, and the separation is deliberate. It was not worked around.
+- **So the required smoke "through `RUN_PROGRAM.cmd`" is not fulfilled for this page.** The research-window run is
+  the real Windows program code and a real window, but it is another entry than the launcher.
+- **Method.** UI Automation only: buttons by Invoke, page scrolling by the scroll bar's value; no mouse, no
+  keyboard, no list popup. The window came to the foreground six times when a button was invoked; the attempt to
+  return the foreground to the previous window did not succeed in this run.
+- 19 screenshots and the log are in the work directory (§28.6).
+
+### 28.5 Remaining stale consumers
+
+Not changed here; each is outside the allowed files.
+
+| Consumer | State |
+|---|---|
+| **The normal program (`RUN_PROGRAM.cmd`)** | does not show Research Results at all, neither the current nor the historical results |
+| **Portable builds** (`packaging/portable_rc*/`) | made before this snapshot existed. Whether a new build would carry the file was not checked; without it section A shows the refusal "is missing" and nothing else. Not built or tested here |
+| `services/plate_physical_review.py`, `services/plate_registration_readiness.py`, `services/plate_study.py` (Plate Study page) | still state the 261016 window as ≈ 215.4 × 285.2 mm and cite the PRIORITY-1 research MAC without a historical note |
+| `docs/research/real_modal_matching_202610/` (`PLATE_MODAL_MATCHING.csv`, `RESULTS.md`) | the archived tables themselves are unchanged, by instruction; only the page names them historical |
+| `research/m11_r65/` and `research/real_modal_matching/run_real_matching.py` | read the superseded reconstruction (§27.4) |
+| `docs/reconciliation/M11_SINGLE_CFRP_PLATE.*`, `PLATE_WORKBENCH_RC1.md`, `plate_physical_readiness_p9/`, `plate_fe_response_p10/`, `plate_s4_central/` | cite the superseded window (§27.4) |
+| The local record `matching_record.json` of PRIORITY-1 | a file outside the repository; shown under the HISTORICAL note when loaded |
+| The page's head line | still reads "Archived research results of PRIORITY-1–4 and PRIORITY-6"; left as it is, since other tests use it |
+
+### 28.6 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `de543b15…` and a clean tracked tree before the edit |
+| Sources of the snapshot | six files equal their recorded hashes when the snapshot was built and in the test |
+| Historical snapshot | the eight archived files and their recorded hashes are unchanged; `docs/auto_id`, `docs/registrations`, `docs/baseline` have no difference to HEAD |
+| Tests | `tests.test_priority5_research_results`: 26 OK. `tests.test_priority6_sp10_fe_shapes`: 8 OK. `tests.test_priority7_sp10_research`: 23 OK. `tests.test_new_gui1_workspace`: 28 OK. `tests.test_plate_physical_review`: 36 OK. `tests.test_single_plate_fe_response`: 37 OK. `tests.test_windows_portable_rc1` / `rc2` / `rc3`: 4 / 6 / 5 OK. `tests/test_working_draft_r1.py` (through discovery; it does not load by module name, before or after this change): 6 OK. Run one at a time; no test skipped |
+
+Changed in the repository: `src/services/research_results_reader.py`, `src/new_gui/research_results_model.py`,
+`src/new_gui/research_results_panel.py`, `tests/test_priority5_research_results.py`,
+`docs/research/plate_only/plate_comparison_261027.json` (new) and this report.
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_CURRENT_RESEARCH_VIEW_01` (outside git):
+`build_snapshot.py`, `smoke.ps1` with `run_program_cmd_window.png` and `run_program_cmd_log.json`,
+`smoke_research.ps1` with `smoke_01_top.png` … `smoke_13_historical_inverse.png` and `smoke_log.json`, `tests.log`.
 
 ## Not changed
 

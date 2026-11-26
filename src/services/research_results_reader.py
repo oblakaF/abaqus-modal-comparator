@@ -373,6 +373,297 @@ def workspace_link(specimen: str, experimental_identity, fe_identity) -> tuple:
     return True, VERIFIED_BANNER
 
 
-__all__ = ["LABELS", "LocalRecord", "MacMatrix", "NOT_VERIFIED_BANNER", "RecordRefused", "SNAPSHOT_FILES",
+# ----------------------------------------------------------------------------- the current plate research snapshot
+#
+# PLATE-0875-CURRENT-RESEARCH-VIEW-01. The archived PRIORITY-1–4 plate tables above rest on scan-point positions that
+# were found to be wrong along FE X (plate README §23). The results recomputed with the corrected, instrument-derived
+# positions (§24–§26) are kept in one separate file. It is a display record: it is not registration evidence, not an
+# identification input and not a pairing record, and nothing above reads it. It is shown only when its SHA-256 is the
+# one recorded here AND its content is consistent with itself (every error, first-ranked mode and summary value is
+# recomputed from the frequencies and matrices it holds); otherwise it is refused with the reason, never replaced.
+
+PLATE_COMPARISON_FILE = ("docs/research/plate_only/plate_comparison_261027.json",
+                         "dc2ac694322304890acd5c4de90548db20ffa5a875607d5fc87fd87235aa53e8")
+PLATE_COMPARISON_SCHEMA = "research/plate-0875/comparison-snapshot/v1"
+PLATE_COMPARISON_LABELS = ("RESEARCH_ONLY", "PHYSICAL_REGISTRATION_NOT_VERIFIED", "NOT_A_MATERIAL_PROPERTY",
+                           "MODEL_FORM_HYPOTHESIS")
+PLATE_MODELS = ("BASELINE", "THICKNESS_ONLY", "DIRECTIONAL_ONLY", "COMBINED")
+PLATE_COMPARISON_SOURCES = ("results_24", "results_25", "results_26", "protocol_25", "protocol_26",
+                            "corrected_reconstruction_27")
+PLATE_FE_MODES = tuple(range(7, 21))
+PLATE_MAC_LEVEL = 0.80  # the existing descriptive level of the research (never a pairing decision here)
+PLATE_FREQUENCY_LEVEL = 5.0  # per cent; the existing descriptive level
+HISTORICAL_PLATE_GEOMETRY = (
+    "HISTORICAL — SUPERSEDED SCAN GEOMETRY. Computed with the 261016 diagnostic reconstruction W301xH300, whose "
+    "scan window is 215.4 mm wide instead of 287.1 mm (a unit-conversion error, plate README §23): the point "
+    "positions are wrong along FE X by up to 49.3 mm. Kept unchanged as the archived record; not a current result.")
+
+
+class PlateComparisonRefused(ValueError):
+    """The current plate research snapshot is missing, changed or inconsistent; it is not shown."""
+
+
+@dataclass(frozen=True)
+class PlateRecord:
+    exp: int
+    f_exp_hz: float
+    corresponding_fe: int
+    corresponding_hz: float
+    frequency_error_pct: float
+    mac_corresponding: float
+    first_fe: int
+    mac_first: float
+    mac_range: tuple
+    first_unchanged: str
+
+
+@dataclass(frozen=True)
+class PlateModel:
+    key: str
+    title: str
+    origin: str
+    readme: str
+    inputs: dict
+    identity: dict
+    fe_hz: tuple
+    records: tuple  # PlateRecord
+    mac: tuple  # 11 rows × 14 values
+    summary: dict
+
+
+@dataclass(frozen=True)
+class PlateComparison:
+    path: str
+    sha256: str
+    labels: tuple
+    status: dict
+    specimen: dict
+    geometry: dict
+    exp_hz: tuple
+    fe_modes: tuple
+    correspondence: str
+    models: dict  # key → PlateModel, in PLATE_MODELS order
+    tracking: dict
+    criteria: dict
+    unresolved_records: tuple
+    limitations: tuple
+    sources: tuple
+    documented_in: str
+
+
+def _need(condition: bool, reason: str) -> None:
+    if not condition:
+        raise PlateComparisonRefused(reason)
+
+
+def _number(value, what: str, low: Optional[float] = None, high: Optional[float] = None) -> float:
+    _need(not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value),
+          f"{what}: {value!r} is not a finite number")
+    _need(low is None or value >= low, f"{what}: {value} is below {low}")
+    _need(high is None or value <= high, f"{what}: {value} is above {high}")
+    return float(value)
+
+
+def _close(a: float, b: float, tolerance: float) -> bool:
+    return abs(a - b) <= tolerance
+
+
+def validate_plate_comparison(document, path: str = PLATE_COMPARISON_FILE[0], sha256: str = "") -> PlateComparison:
+    """Check the structure and the internal consistency of a snapshot document; refuse with the reason."""
+    _need(isinstance(document, dict), "the snapshot is not a JSON object")
+    _need(document.get("schema") == PLATE_COMPARISON_SCHEMA, f"schema {document.get('schema')!r} is not "
+                                                             f"{PLATE_COMPARISON_SCHEMA!r}")
+    labels = document.get("labels")
+    _need(isinstance(labels, list) and all(x in labels for x in PLATE_COMPARISON_LABELS),
+          "the research labels " + " / ".join(PLATE_COMPARISON_LABELS) + " are not all present")
+    status = document.get("status")
+    _need(isinstance(status, dict) and "not registration evidence" in str(status.get("use"))
+          and "not an identification input" in str(status.get("use")),
+          "the snapshot does not state that it is neither registration evidence nor an identification input")
+    _need(isinstance(status.get("gates"), list) and {"M8 GATE NOT_MET", "D-077 NO_GLOBAL_PARAMETER_VALUE",
+                                                      "production Auto-ID BLOCKED"} <= set(status["gates"]),
+          "the unchanged scientific gates are not stated")
+    specimen = document.get("specimen")
+    plate = SPECIMENS["PLATE"]
+    _need(isinstance(specimen, dict) and specimen.get("key") == "PLATE" and specimen.get("series") == plate.series,
+          "the snapshot is not of the series " + plate.series)
+    _need(specimen.get("experiment_sha256") == plate.experiment_sha256,
+          f"experimental source SHA-256 {str(specimen.get('experiment_sha256'))[:12]}… is not the series' "
+          f"{plate.experiment_sha256[:12]}…")
+    exp = (document.get("experiment") or {}).get("hz") if isinstance(document.get("experiment"), dict) else None
+    _need(isinstance(exp, list) and len(exp) == plate.modes, f"the snapshot has not {plate.modes} experimental records")
+    exp_hz = tuple(_number(f, f"EXP{i + 1} frequency", 1e-9) for i, f in enumerate(exp))
+    _need(list(exp_hz) == sorted(exp_hz), "the experimental frequencies are not ascending")
+    _need(document.get("fe_modes") == list(PLATE_FE_MODES), "the FE modes are not FE7–FE20")
+    geometry = document.get("geometry")
+    _need(isinstance(geometry, dict) and geometry.get("basis") == "CORRECTED_261016"
+          and geometry.get("pixel_normalisation") == "instrument-metadata",
+          "the scan geometry is not the corrected instrument-metadata reconstruction of session 261016")
+    for key in ("window_mm", "plate_plan_mm"):
+        _need(isinstance(geometry.get(key), list) and len(geometry[key]) == 2, f"geometry {key} is not two numbers")
+    window = [_number(v, "scan window", 1e-9) for v in geometry["window_mm"]]
+    plan = [_number(v, "plate plan", 1e-9) for v in geometry["plate_plan_mm"]]
+    gaps = geometry.get("gaps_mm_left_right_bottom_top")
+    _need(isinstance(gaps, list) and len(gaps) == 4, "the four gaps between the scan window and the plate edges are missing")
+    gaps = [_number(v, "gap to the plate edge", 0.0) for v in gaps]
+    _need(_close(gaps[0] + window[0] + gaps[1], plan[0], 1e-3) and _close(gaps[2] + window[1] + gaps[3], plan[1], 1e-3),
+          "the scan window and its gaps do not add up to the plate plan")
+    _need("CONDITIONAL" in str(geometry.get("transfer_261016_to_261027")),
+          "the conditional transfer of the 261016 positions to 261027 is not stated")
+    superseded = geometry.get("superseded")
+    _need(isinstance(superseded, dict) and isinstance(superseded.get("window_mm"), list)
+          and len(superseded["window_mm"]) == 2, "the superseded geometry is not named")
+    _need(_number(superseded["window_mm"][0], "superseded window", 1e-9) < window[0],
+          "the superseded window is not narrower than the corrected one")
+    raw_models = document.get("models")
+    _need(isinstance(raw_models, list) and [m.get("key") if isinstance(m, dict) else None for m in raw_models]
+          == list(PLATE_MODELS), "the models are not " + ", ".join(PLATE_MODELS))
+    models = {}
+    for raw in raw_models:
+        name = raw["key"]
+        inputs, identity = raw.get("inputs"), raw.get("identity")
+        _need(isinstance(inputs, dict) and isinstance(identity, dict), f"{name}: FE inputs or identity missing")
+        for key in ("E1_MPa", "E2_MPa", "G12_MPa", "nu12", "density_t_per_mm3", "mass_g"):
+            _number(inputs.get(key), f"{name} {key}", 1e-12)
+        ends = inputs.get("thickness_mm_at_x0_x301")
+        _need(isinstance(ends, list) and len(ends) == 2 and isinstance(inputs.get("thickness"), str),
+              f"{name}: thickness not stated")
+        [_number(v, f"{name} thickness", 1e-9) for v in ends]
+        _need(isinstance(identity.get("inp_sha256"), str) and len(identity["inp_sha256"]) == 64,
+              f"{name}: the FE input has no SHA-256")
+        fe = raw.get("fe_hz")
+        _need(isinstance(fe, list) and len(fe) == len(PLATE_FE_MODES), f"{name}: not 14 FE frequencies")
+        fe_hz = tuple(_number(f, f"{name} FE frequency", 1e-9) for f in fe)
+        _need(list(fe_hz) == sorted(fe_hz), f"{name}: the FE frequencies are not ascending")
+        matrix = raw.get("mac")
+        _need(isinstance(matrix, list) and len(matrix) == plate.modes, f"{name}: the MAC matrix has not 11 rows")
+        mac = []
+        for i, row in enumerate(matrix):
+            _need(isinstance(row, list) and len(row) == len(PLATE_FE_MODES), f"{name}: MAC row {i + 1} has not 14 values")
+            mac.append(tuple(_number(v, f"{name} MAC row {i + 1}", -1e-9, 1 + 1e-9) for v in row))
+        rows = raw.get("records")
+        _need(isinstance(rows, list) and len(rows) == plate.modes and all(isinstance(r, dict) for r in rows)
+              and [r.get("exp") for r in rows] == list(range(1, plate.modes + 1)),
+              f"{name}: the records are not EXP1–EXP{plate.modes}")
+        records = []
+        for i, r in enumerate(rows):
+            what = f"{name} EXP{i + 1}"
+            _need(r.get("corresponding_fe") in PLATE_FE_MODES and r.get("first_fe") in PLATE_FE_MODES,
+                  f"{what}: FE mode outside FE7–FE20")
+            jc, j1 = r["corresponding_fe"] - PLATE_FE_MODES[0], r["first_fe"] - PLATE_FE_MODES[0]
+            hz = _number(r.get("corresponding_hz"), f"{what} FE frequency", 1e-9)
+            _need(_close(hz, fe_hz[jc], 1e-9), f"{what}: the FE frequency is not that of FE{r['corresponding_fe']}")
+            error = _number(r.get("frequency_error_pct"), f"{what} frequency error")
+            _need(_close(error, 100.0 * (hz / exp_hz[i] - 1.0), 1e-5),
+                  f"{what}: the frequency error {error} does not follow from the two frequencies")
+            mac_c = _number(r.get("mac_corresponding"), f"{what} MAC", -1e-9, 1 + 1e-9)
+            mac_1 = _number(r.get("mac_first"), f"{what} MAC", -1e-9, 1 + 1e-9)
+            _need(_close(mac_c, mac[i][jc], 1e-9), f"{what}: the MAC of the corresponding mode is not the matrix value")
+            _need(_close(mac_1, max(mac[i]), 1e-9) and _close(mac[i][j1], max(mac[i]), 1e-9),
+                  f"{what}: FE{r['first_fe']} is not the first-ranked mode of the matrix row")
+            span = r.get("mac_first_range_declared_scenarios")
+            _need(isinstance(span, list) and len(span) == 2, f"{what}: scenario range missing")
+            span = tuple(_number(v, f"{what} scenario range", -1e-9, 1 + 1e-9) for v in span)
+            _need(span[0] <= span[1], f"{what}: scenario range reversed")
+            records.append(PlateRecord(i + 1, exp_hz[i], r["corresponding_fe"], hz, error, mac_c, r["first_fe"], mac_1,
+                                       span, str(r.get("first_unchanged_in_scenarios", ""))))
+        summary = raw.get("summary")
+        _need(isinstance(summary, dict), f"{name}: summary missing")
+        errors = [abs(r.frequency_error_pct) for r in records]
+        expected = {
+            "records_mac_ge_0_80": [r.exp for r in records if r.mac_first >= PLATE_MAC_LEVEL],
+            "records_mac_below_0_80": [r.exp for r in records if r.mac_first < PLATE_MAC_LEVEL],
+            "records_outside_5_pct": [r.exp for r, e in zip(records, errors) if e > PLATE_FREQUENCY_LEVEL],
+            "first_ranked_is_corresponding": sum(r.first_fe == r.corresponding_fe for r in records)}
+        for key, value in expected.items():
+            _need(summary.get(key) == value, f"{name}: summary {key} {summary.get(key)!r} does not follow from the "
+                                             f"records ({value!r})")
+        for key, value in (("mean_mac_first", sum(r.mac_first for r in records) / len(records)),
+                           ("mean_abs_frequency_error_pct", sum(errors) / len(errors)),
+                           ("max_abs_frequency_error_pct", max(errors))):
+            _need(_close(_number(summary.get(key), f"{name} {key}"), value, 1e-5),
+                  f"{name}: summary {key} does not follow from the records")
+        models[name] = PlateModel(name, str(raw.get("title", name)), str(raw.get("origin", "")), str(raw.get("readme", "")),
+                                  dict(inputs), dict(identity), fe_hz, tuple(records), tuple(mac), dict(summary))
+    for name in ("BASELINE", "THICKNESS_ONLY"):
+        _need(models[name].inputs["E2_MPa"] == models[name].inputs["E1_MPa"], f"{name}: E1 and E2 are not equal")
+    for name in ("DIRECTIONAL_ONLY", "COMBINED"):
+        _need(models[name].inputs["E2_MPa"] < models[name].inputs["E1_MPa"], f"{name}: E2 is not below E1")
+    for name, uniform in (("BASELINE", True), ("DIRECTIONAL_ONLY", True), ("THICKNESS_ONLY", False), ("COMBINED", False)):
+        ends = models[name].inputs["thickness_mm_at_x0_x301"]
+        _need((ends[0] == ends[1]) is uniform, f"{name}: the thickness is not " + ("uniform" if uniform else "a gradient"))
+    # what must stay visible: the unresolved records, the failed ±5 % criterion and the lost branches
+    combined = models["COMBINED"].summary
+    unresolved = document.get("unresolved_records")
+    _need(unresolved == combined["records_mac_below_0_80"],
+          f"unresolved records {unresolved!r} are not the combined model's records below {PLATE_MAC_LEVEL:.2f} "
+          f"({combined['records_mac_below_0_80']!r})")
+    criteria = document.get("criteria")
+    _need(isinstance(criteria, dict) and isinstance(criteria.get("combined_model_readme_26"), dict)
+          and isinstance(criteria.get("directional_test_readme_25"), dict), "the declared criteria are missing")
+    b = criteria["combined_model_readme_26"].get("B_all_class_frequencies_within_5_pct")
+    _need(isinstance(b, dict) and b.get("records_outside") == combined["records_outside_5_pct"]
+          and b.get("verdict") == ("FAIL" if combined["records_outside_5_pct"] else "PASS"),
+          "the ±5 % criterion of the combined model does not follow from its frequency errors")
+    _need(all(v in ("PASS", "FAIL") for v in criteria["directional_test_readme_25"].values())
+          and len(criteria["directional_test_readme_25"]) == 3, "the three criteria of the directional test are not stated")
+    tracking = document.get("tracking")
+    _need(isinstance(tracking, dict) and isinstance(tracking.get("rows"), list)
+          and len(tracking["rows"]) == len(PLATE_FE_MODES), "the branch tracking has not 14 rows")
+    level = _number(tracking.get("minimum_mac_for_tracked"), "tracking level", 0.0, 1.0)
+    lost = []
+    for r in tracking["rows"]:
+        _need(isinstance(r, dict) and r.get("reference_fe") in PLATE_FE_MODES and r.get("target_fe") in PLATE_FE_MODES,
+              "branch tracking: FE mode outside FE7–FE20")
+        value = _number(r.get("mac"), "FE-to-FE MAC", -1e-9, 1 + 1e-9)
+        _need(r.get("status") == ("TRACKED" if value >= level else "LOST"),
+              f"branch FE{r['reference_fe']}: status {r.get('status')!r} does not follow from MAC {value}")
+        if r["status"] == "LOST":
+            lost.append(r["reference_fe"])
+    _need(tracking.get("lost") == lost, "the list of lost branches does not follow from the tracking rows")
+    _need(b.get("correspondence_not_confirmed_by_tracking")
+          == [k for k in range(1, plate.modes + 1) if PLATE_FE_MODES[0] - 1 + k in lost],
+          "the records whose correspondence is not confirmed by tracking do not follow from the lost branches")
+    limitations = document.get("limitations")
+    _need(isinstance(limitations, list) and limitations and all(isinstance(x, str) and x for x in limitations),
+          "the limitations are missing")
+    sources = document.get("sources")
+    _need(isinstance(sources, list) and [s.get("name") if isinstance(s, dict) else None for s in sources]
+          == list(PLATE_COMPARISON_SOURCES), "the sources are not " + ", ".join(PLATE_COMPARISON_SOURCES))
+    for s in sources:
+        _need(isinstance(s.get("sha256"), str) and len(s["sha256"]) == 64 and isinstance(s.get("path"), str),
+              f"source {s.get('name')}: path or SHA-256 missing")
+    _need(geometry.get("reconstruction_sha256") == sources[-1]["sha256"],
+          "the corrected reconstruction named by the geometry is not the listed source")
+    return PlateComparison(path, sha256, tuple(labels), dict(status), dict(specimen), dict(geometry), exp_hz,
+                           PLATE_FE_MODES, str(document.get("correspondence", "")), models, dict(tracking),
+                           dict(criteria), tuple(unresolved), tuple(limitations),
+                           tuple((s["name"], s["path"], s["sha256"]) for s in sources),
+                           str(document.get("documented_in", "")))
+
+
+def load_plate_comparison(root: Path = REPO) -> PlateComparison:
+    """Read the current plate research snapshot: only with the recorded SHA-256 and a consistent content."""
+    relative, expected = PLATE_COMPARISON_FILE
+    path = root / relative
+    if not path.is_file():
+        raise PlateComparisonRefused(f"{relative} is missing")
+    if path.stat().st_size > MAX_RECORD_BYTES:
+        raise PlateComparisonRefused(f"{relative} is larger than {MAX_RECORD_BYTES // (1024 * 1024)} MB")
+    data = path.read_bytes().replace(b"\r\n", b"\n")  # the committed (LF) form, whatever the checkout wrote
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != expected:
+        raise PlateComparisonRefused(f"{relative}: SHA-256 {digest[:12]}… is not the recorded {expected[:12]}… — the "
+                                     "file changed, so the snapshot is not shown")
+    try:
+        document = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise PlateComparisonRefused(f"{relative} is not valid JSON: {error}") from error
+    return validate_plate_comparison(document, relative, digest)
+
+
+__all__ = ["HISTORICAL_PLATE_GEOMETRY", "LABELS", "LocalRecord", "MacMatrix", "NOT_VERIFIED_BANNER",
+           "PLATE_COMPARISON_FILE", "PLATE_COMPARISON_LABELS", "PLATE_COMPARISON_SOURCES", "PLATE_MODELS",
+           "PlateComparison", "PlateComparisonRefused", "PlateModel", "PlateRecord", "RecordRefused", "SNAPSHOT_FILES",
            "SPECIMENS", "STATUSES", "Snapshot", "SnapshotRefused", "VERIFIED_BANNER", "load_local_record",
-           "load_snapshot", "scenario_detail", "workspace_link"]
+           "load_plate_comparison", "load_snapshot", "scenario_detail", "validate_plate_comparison", "workspace_link"]

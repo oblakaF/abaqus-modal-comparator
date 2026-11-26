@@ -1,0 +1,1955 @@
+{
+ "correspondence": "record k against the FE mode of its class order (README 22.6); for the two E2 = 41 000 models that is FE 6 + k. No EXP MAC enters it. It is a research correspondence, never a confirmed pair",
+ "criteria": {
+  "combined_model_readme_26": {
+   "A_shapes_of_records_3_4_7": {
+    "3": {
+     "combined": 0.716798,
+     "described": false,
+     "directional_only": 0.68224,
+     "improved": false
+    },
+    "4": {
+     "combined": 0.583665,
+     "described": false,
+     "directional_only": 0.562239,
+     "improved": false
+    },
+    "7": {
+     "combined": 0.980718,
+     "described": true,
+     "directional_only": 0.789301,
+     "improved": true
+    }
+   },
+   "B_all_class_frequencies_within_5_pct": {
+    "correspondence_not_confirmed_by_tracking": [
+     7,
+     8
+    ],
+    "max_abs_error_pct": 5.262375,
+    "records_outside": [
+     2
+    ],
+    "verdict": "FAIL"
+   },
+   "C_no_deterioration": {
+    "verdict": "NO_DETERIORATION"
+   },
+   "D_interaction": {
+    "non_additive_frequency_records": [
+     7,
+     8,
+     10
+    ],
+    "non_additive_mac_records": [
+     2,
+     3,
+     8,
+     10
+    ]
+   },
+   "overall": {
+    "improved_records": [
+     7
+    ],
+    "improves_the_model": true,
+    "keeps_frequency_agreement_of_25": false
+   }
+  },
+  "directional_test_readme_25": {
+   "1_class_sequence": "PASS",
+   "2_class_frequencies": "PASS",
+   "3_reduced_basis": "PASS"
+  }
+ },
+ "documented_in": "docs/research/plate_only/README.md, sections 24-27",
+ "experiment": {
+  "hz": [
+   18.630677638337268,
+   54.619270835105915,
+   63.49502370145474,
+   66.84666764802697,
+   74.21490489340934,
+   112.26550953287659,
+   145.93569267362562,
+   157.85082748820037,
+   169.18488760554658,
+   180.1363392396999,
+   191.60186134004002
+  ]
+ },
+ "fe_modes": [
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20
+ ],
+ "geometry": {
+  "basis": "CORRECTED_261016",
+  "gaps_mm_left_right_bottom_top": [
+   7.0879,
+   6.8043,
+   7.0169,
+   7.6893
+  ],
+  "pixel_normalisation": "instrument-metadata",
+  "placement": "D (CONVENTION_ONLY)",
+  "plate_plan_mm": [
+   301.0,
+   300.0
+  ],
+  "reconstruction_file": "plate_reconstruction_W301xH300_CORRECTED_instrument_metadata.json (outside the repository)",
+  "reconstruction_sha256": "8047872aac94cd7f2aa91a3f5ec7db4667555ab31d23115824633c7e5270a237",
+  "session_of_the_instrument_record": "261016",
+  "superseded": {
+   "file": "runs/m11_carbon_plate/plate_reconstruction_W301xH300.json",
+   "file_sha256": "09be8b8812d4e852e53a74f0b461200a7228bb8a794fd06d18adc6713e220389",
+   "max_point_shift_mm": 49.3089,
+   "reason": "scan-point u read in the wrong unit frame (README 23): the window was compressed to 0.750 of its width along X",
+   "window_mm": [
+    215.4171,
+    285.197
+   ]
+  },
+  "svd_sha256": "0a770b1b18f8d1192343be84caf4b5e359416179ec1077004036f3b0674d2e6e",
+  "transfer_261016_to_261027": "CONDITIONAL: the 261027 series has no instrument record of its scan window. The 261016 positions are used for 261027 on the owner's statement that the same points were scanned",
+  "window_mm": [
+   287.1078,
+   285.2938
+  ]
+ },
+ "labels": [
+  "RESEARCH_ONLY",
+  "PHYSICAL_REGISTRATION_NOT_VERIFIED",
+  "NOT_A_MATERIAL_PROPERTY",
+  "MODEL_FORM_HYPOTHESIS"
+ ],
+ "limitations": [
+  "EXP 3 and EXP 4 are not explained by any of the four models: research MAC 0.72 and 0.58 in the combined model; both are mixtures of FE 9 and FE 10.",
+  "Combined model: the declared criterion 'all class frequencies within +-5 %' FAILS - EXP 2 at -5.26 %. +-5 % is a descriptive level, not a gate.",
+  "Branch tracking, combined against directional only: FE 13 and FE 14 (the modes of EXP 7 and EXP 8) are LOST (MAC 0.83 and 0.84). For these two records the correspondence rests on the frequency position and the dominant parity class, not on a tracked branch. FE 20 is lost as well (above the records).",
+  "The 261027 positions are the 261016 positions on the owner's statement; placement D is a convention. PHYSICAL_REGISTRATION_NOT_VERIFIED.",
+  "Stiffness and thickness are not separable by frequencies; the cause of the stiffness ratio is not identified; the interior thickness is not measured.",
+  "One solve per model: neither the ratio nor the gradient was varied. The combined model's mass is 0.58 % below the recorded mass; no density correction was made.",
+  "Labels and MAC values are research quantities. No pairing status, no registration and no parameter value follows from them."
+ ],
+ "models": [
+  {
+   "fe_hz": [
+    19.072,
+    59.874,
+    62.009,
+    71.85,
+    72.19,
+    116.58,
+    167.49,
+    168.61,
+    174.8,
+    179.9,
+    213.2,
+    213.95,
+    295.78,
+    327.9
+   ],
+   "identity": {
+    "fe_manifest_sha256": "354966dae2126d11610b9fdb56804006b56b40aea1cf7a180278ef375893b4c7",
+    "inp_sha256": "962f75f2fd5d9e6d97578df828599bc150b9777648392b29e8c856546af81df3"
+   },
+   "inputs": {
+    "E1_MPa": 56000.0,
+    "E2_MPa": 56000.0,
+    "G12_MPa": 5000.0,
+    "boundary": "free-free",
+    "density_t_per_mm3": 1.498e-09,
+    "mass_g": 118.36072,
+    "mesh": "S4R, 100 x 100 elements, 10 201 nodes",
+    "nu12": 0.05,
+    "plan_mm": [
+     301.0,
+     300.0
+    ],
+    "thickness": "uniform 0.875 mm",
+    "thickness_mm_at_x0_x301": [
+     0.875,
+     0.875
+    ]
+   },
+   "key": "BASELINE",
+   "mac": [
+    [
+     0.967766,
+     0.002078,
+     0.009323,
+     0.00077,
+     0.002255,
+     0.00013,
+     3.7e-05,
+     4e-05,
+     0.000169,
+     0.000237,
+     0.000759,
+     0.002427,
+     0.000167,
+     0.000244
+    ],
+    [
+     3.6e-05,
+     0.449278,
+     0.523684,
+     0.000463,
+     0.018212,
+     0.00106,
+     0.000151,
+     0.001015,
+     8.7e-05,
+     1e-05,
+     0.000251,
+     2.7e-05,
+     3.1e-05,
+     3.9e-05
+    ],
+    [
+     0.000478,
+     0.449556,
+     0.249318,
+     0.000792,
+     0.256791,
+     0.000469,
+     0.000586,
+     0.000179,
+     0.000789,
+     9.5e-05,
+     0.000576,
+     1e-05,
+     2.8e-05,
+     0.000305
+    ],
+    [
+     0.000227,
+     0.221049,
+     0.200823,
+     0.003915,
+     0.562191,
+     0.003904,
+     0.000274,
+     0.000143,
+     0.000479,
+     0.000222,
+     0.000603,
+     0.000646,
+     0.00017,
+     6.9e-05
+    ],
+    [
+     0.003752,
+     0.000481,
+     0.000667,
+     0.985593,
+     0.000813,
+     3.4e-05,
+     3.9e-05,
+     0.000102,
+     0.00026,
+     0.000251,
+     1e-05,
+     0.000395,
+     3.5e-05,
+     0.000196
+    ],
+    [
+     5.6e-05,
+     0.000106,
+     0.007587,
+     0.000237,
+     0.002234,
+     0.989528,
+     0.000152,
+     2e-05,
+     6.1e-05,
+     1.2e-05,
+     0.000957,
+     0.001532,
+     1.1e-05,
+     3e-06
+    ],
+    [
+     0.001815,
+     0.000295,
+     5.3e-05,
+     0.000515,
+     7e-05,
+     0.002848,
+     0.00122,
+     0.789572,
+     0.058877,
+     0.130231,
+     5.6e-05,
+     0.00389,
+     3e-05,
+     0.000215
+    ],
+    [
+     0.004508,
+     3.4e-05,
+     0.000688,
+     2.1e-05,
+     0.000621,
+     0.000247,
+     0.000261,
+     0.169383,
+     0.37464,
+     0.43233,
+     0.000551,
+     0.000933,
+     0.001029,
+     0.000612
+    ],
+    [
+     7.9e-05,
+     0.000429,
+     0.000191,
+     7.5e-05,
+     3e-05,
+     0.000632,
+     0.979387,
+     0.001128,
+     0.0,
+     0.001293,
+     0.000635,
+     0.004624,
+     4.8e-05,
+     0.000202
+    ],
+    [
+     0.01257,
+     1.1e-05,
+     1.3e-05,
+     0.001327,
+     0.000128,
+     5.9e-05,
+     2e-05,
+     0.002273,
+     0.566916,
+     0.406621,
+     0.000296,
+     0.007695,
+     0.000148,
+     7.2e-05
+    ],
+    [
+     6.1e-05,
+     0.00068,
+     6.6e-05,
+     0.002537,
+     1.9e-05,
+     0.000979,
+     0.005124,
+     0.010743,
+     0.001562,
+     0.010162,
+     0.012918,
+     0.957307,
+     0.000995,
+     1.5e-05
+    ]
+   ],
+   "origin": "archived solve (M11 R6); no solve in README 24-26",
+   "readme": "17, 24",
+   "records": [
+    {
+     "corresponding_fe": 7,
+     "corresponding_hz": 19.072,
+     "exp": 1,
+     "first_fe": 7,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 2.368794,
+     "mac_corresponding": 0.967766,
+     "mac_first": 0.967766,
+     "mac_first_range_declared_scenarios": [
+      0.958001,
+      0.972891
+     ]
+    },
+    {
+     "corresponding_fe": 8,
+     "corresponding_hz": 59.874,
+     "exp": 2,
+     "first_fe": 9,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 9.620651,
+     "mac_corresponding": 0.449278,
+     "mac_first": 0.523684,
+     "mac_first_range_declared_scenarios": [
+      0.518738,
+      0.524471
+     ]
+    },
+    {
+     "corresponding_fe": 9,
+     "corresponding_hz": 62.009,
+     "exp": 3,
+     "first_fe": 8,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -2.340378,
+     "mac_corresponding": 0.249318,
+     "mac_first": 0.449556,
+     "mac_first_range_declared_scenarios": [
+      0.440336,
+      0.452306
+     ]
+    },
+    {
+     "corresponding_fe": 11,
+     "corresponding_hz": 72.19,
+     "exp": 4,
+     "first_fe": 11,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 7.993416,
+     "mac_corresponding": 0.562191,
+     "mac_first": 0.562191,
+     "mac_first_range_declared_scenarios": [
+      0.55209,
+      0.563382
+     ]
+    },
+    {
+     "corresponding_fe": 10,
+     "corresponding_hz": 71.85,
+     "exp": 5,
+     "first_fe": 10,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -3.186563,
+     "mac_corresponding": 0.985593,
+     "mac_first": 0.985593,
+     "mac_first_range_declared_scenarios": [
+      0.966558,
+      0.990925
+     ]
+    },
+    {
+     "corresponding_fe": 12,
+     "corresponding_hz": 116.58,
+     "exp": 6,
+     "first_fe": 12,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 3.843113,
+     "mac_corresponding": 0.989528,
+     "mac_first": 0.989528,
+     "mac_first_range_declared_scenarios": [
+      0.970256,
+      0.99313
+     ]
+    },
+    {
+     "corresponding_fe": 14,
+     "corresponding_hz": 168.61,
+     "exp": 7,
+     "first_fe": 14,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 15.537191,
+     "mac_corresponding": 0.789572,
+     "mac_first": 0.789572,
+     "mac_first_range_declared_scenarios": [
+      0.77261,
+      0.791185
+     ]
+    },
+    {
+     "corresponding_fe": 15,
+     "corresponding_hz": 174.8,
+     "exp": 8,
+     "first_fe": 16,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 10.737462,
+     "mac_corresponding": 0.37464,
+     "mac_first": 0.43233,
+     "mac_first_range_declared_scenarios": [
+      0.408704,
+      0.445715
+     ]
+    },
+    {
+     "corresponding_fe": 13,
+     "corresponding_hz": 167.49,
+     "exp": 9,
+     "first_fe": 13,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -1.001796,
+     "mac_corresponding": 0.979387,
+     "mac_first": 0.979387,
+     "mac_first_range_declared_scenarios": [
+      0.961328,
+      0.9798
+     ]
+    },
+    {
+     "corresponding_fe": 16,
+     "corresponding_hz": 179.9,
+     "exp": 10,
+     "first_fe": 15,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -0.1312,
+     "mac_corresponding": 0.406621,
+     "mac_first": 0.566916,
+     "mac_first_range_declared_scenarios": [
+      0.549396,
+      0.569539
+     ]
+    },
+    {
+     "corresponding_fe": 18,
+     "corresponding_hz": 213.95,
+     "exp": 11,
+     "first_fe": 18,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 11.663842,
+     "mac_corresponding": 0.957307,
+     "mac_first": 0.957307,
+     "mac_first_range_declared_scenarios": [
+      0.922086,
+      0.964273
+     ]
+    }
+   ],
+   "summary": {
+    "first_ranked_is_corresponding": 7,
+    "max_abs_frequency_error_pct": 15.537191,
+    "mean_abs_frequency_error_pct": 6.220401,
+    "mean_mac_first": 0.745803,
+    "records_mac_below_0_80": [
+     2,
+     3,
+     4,
+     7,
+     8,
+     10
+    ],
+    "records_mac_ge_0_80": [
+     1,
+     5,
+     6,
+     9,
+     11
+    ],
+    "records_outside_5_pct": [
+     2,
+     4,
+     7,
+     8,
+     11
+    ]
+   },
+   "title": "Baseline"
+  },
+  {
+   "fe_hz": [
+    18.997,
+    59.389,
+    61.438,
+    71.429,
+    72.101,
+    115.93,
+    164.12,
+    166.42,
+    174.8,
+    180.49,
+    211.86,
+    213.1,
+    294.06,
+    318.18
+   ],
+   "identity": {
+    "inp_sha256": "dcb639f14a008eeb29179d36817993279451b615b9061753a9afec27b628bb4b"
+   },
+   "inputs": {
+    "E1_MPa": 56000.0,
+    "E2_MPa": 56000.0,
+    "G12_MPa": 5000.0,
+    "boundary": "free-free",
+    "density_t_per_mm3": 1.498e-09,
+    "mass_g": 117.68438,
+    "mesh": "S4R, 100 x 100 elements, 10 201 nodes",
+    "nu12": 0.05,
+    "plan_mm": [
+     301.0,
+     300.0
+    ],
+    "thickness": "0.81 mm at X = 0 to 0.93 mm at X = 301, linear in X (archived wedge of README 18: solved with 0.93 mm at X = 0; its results are reflected X -> 301 - X)",
+    "thickness_mm_at_x0_x301": [
+     0.81,
+     0.93
+    ]
+   },
+   "key": "THICKNESS_ONLY",
+   "mac": [
+    [
+     0.970546,
+     0.001883,
+     0.009164,
+     0.000243,
+     0.002651,
+     9.8e-05,
+     8.3e-05,
+     2e-05,
+     9.7e-05,
+     0.000446,
+     0.000729,
+     0.002355,
+     0.000126,
+     0.00023
+    ],
+    [
+     2.9e-05,
+     0.537125,
+     0.457371,
+     0.000467,
+     0.001126,
+     0.000905,
+     0.001007,
+     0.000126,
+     2e-06,
+     9.1e-05,
+     0.000211,
+     3.4e-05,
+     3.4e-05,
+     1.5e-05
+    ],
+    [
+     0.000415,
+     0.317554,
+     0.393486,
+     0.000728,
+     0.241413,
+     0.000982,
+     0.000104,
+     0.000413,
+     0.000935,
+     8e-06,
+     0.0006,
+     2.8e-05,
+     3.1e-05,
+     0.000106
+    ],
+    [
+     0.000244,
+     0.27467,
+     0.133954,
+     0.003957,
+     0.570786,
+     0.006398,
+     0.000299,
+     0.000243,
+     0.000245,
+     0.000225,
+     0.000625,
+     0.000767,
+     0.000136,
+     3.2e-05
+    ],
+    [
+     0.006008,
+     0.000502,
+     0.000426,
+     0.98708,
+     0.001007,
+     3.3e-05,
+     3.4e-05,
+     4.1e-05,
+     0.000341,
+     3e-06,
+     7e-06,
+     0.000365,
+     5.1e-05,
+     5e-05
+    ],
+    [
+     5.2e-05,
+     0.000773,
+     0.009958,
+     0.000238,
+     0.008386,
+     0.982628,
+     0.000101,
+     0.000153,
+     5.7e-05,
+     7.4e-05,
+     0.001935,
+     0.00144,
+     3e-06,
+     0.0001
+    ],
+    [
+     0.001977,
+     0.000254,
+     3.9e-05,
+     0.000517,
+     0.000155,
+     0.002853,
+     0.962427,
+     0.001214,
+     0.020309,
+     0.001865,
+     5.5e-05,
+     0.000489,
+     1.5e-05,
+     0.000735
+    ],
+    [
+     0.004381,
+     4.4e-05,
+     0.000501,
+     1e-05,
+     0.00076,
+     0.000265,
+     0.009646,
+     0.000286,
+     0.206435,
+     0.738397,
+     0.000537,
+     0.010137,
+     0.001021,
+     1e-06
+    ],
+    [
+     8e-05,
+     0.001126,
+     0.001018,
+     6.3e-05,
+     3.9e-05,
+     0.000612,
+     0.000478,
+     0.981134,
+     3.9e-05,
+     0.001235,
+     0.000674,
+     0.005195,
+     1.8e-05,
+     0.000735
+    ],
+    [
+     0.012925,
+     1.4e-05,
+     5e-06,
+     0.004183,
+     0.000126,
+     6.4e-05,
+     0.015506,
+     2.3e-05,
+     0.753312,
+     0.217303,
+     0.000306,
+     0.006036,
+     3.8e-05,
+     6e-06
+    ],
+    [
+     4.2e-05,
+     0.000605,
+     4.5e-05,
+     0.002313,
+     6.6e-05,
+     0.001235,
+     0.017562,
+     0.005024,
+     0.008824,
+     0.000691,
+     0.012961,
+     0.944261,
+     0.00804,
+     0.000232
+    ]
+   ],
+   "origin": "archived wedge solve, one ODB extraction in README 18; fields reflected in X",
+   "readme": "18, 24",
+   "records": [
+    {
+     "corresponding_fe": 7,
+     "corresponding_hz": 18.997,
+     "exp": 1,
+     "first_fe": 7,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 1.966232,
+     "mac_corresponding": 0.970546,
+     "mac_first": 0.970546,
+     "mac_first_range_declared_scenarios": [
+      0.963203,
+      0.973288
+     ]
+    },
+    {
+     "corresponding_fe": 8,
+     "corresponding_hz": 59.389,
+     "exp": 2,
+     "first_fe": 8,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 8.732686,
+     "mac_corresponding": 0.537125,
+     "mac_first": 0.537125,
+     "mac_first_range_declared_scenarios": [
+      0.529051,
+      0.538459
+     ]
+    },
+    {
+     "corresponding_fe": 9,
+     "corresponding_hz": 61.438,
+     "exp": 3,
+     "first_fe": 9,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -3.239661,
+     "mac_corresponding": 0.393486,
+     "mac_first": 0.393486,
+     "mac_first_range_declared_scenarios": [
+      0.389446,
+      0.394341
+     ]
+    },
+    {
+     "corresponding_fe": 11,
+     "corresponding_hz": 72.101,
+     "exp": 4,
+     "first_fe": 11,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 7.860276,
+     "mac_corresponding": 0.570786,
+     "mac_first": 0.570786,
+     "mac_first_range_declared_scenarios": [
+      0.557649,
+      0.575785
+     ]
+    },
+    {
+     "corresponding_fe": 10,
+     "corresponding_hz": 71.429,
+     "exp": 5,
+     "first_fe": 10,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -3.753835,
+     "mac_corresponding": 0.98708,
+     "mac_first": 0.98708,
+     "mac_first_range_declared_scenarios": [
+      0.970166,
+      0.990259
+     ]
+    },
+    {
+     "corresponding_fe": 12,
+     "corresponding_hz": 115.93,
+     "exp": 6,
+     "first_fe": 12,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 3.264128,
+     "mac_corresponding": 0.982628,
+     "mac_first": 0.982628,
+     "mac_first_range_declared_scenarios": [
+      0.958693,
+      0.990676
+     ]
+    },
+    {
+     "corresponding_fe": 13,
+     "corresponding_hz": 164.12,
+     "exp": 7,
+     "first_fe": 13,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 12.460493,
+     "mac_corresponding": 0.962427,
+     "mac_first": 0.962427,
+     "mac_first_range_declared_scenarios": [
+      0.935416,
+      0.962964
+     ]
+    },
+    {
+     "corresponding_fe": 15,
+     "corresponding_hz": 174.8,
+     "exp": 8,
+     "first_fe": 16,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 10.737462,
+     "mac_corresponding": 0.206435,
+     "mac_first": 0.738397,
+     "mac_first_range_declared_scenarios": [
+      0.716947,
+      0.73997
+     ]
+    },
+    {
+     "corresponding_fe": 14,
+     "corresponding_hz": 166.42,
+     "exp": 9,
+     "first_fe": 14,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -1.63424,
+     "mac_corresponding": 0.981134,
+     "mac_first": 0.981134,
+     "mac_first_range_declared_scenarios": [
+      0.962348,
+      0.981752
+     ]
+    },
+    {
+     "corresponding_fe": 16,
+     "corresponding_hz": 180.49,
+     "exp": 10,
+     "first_fe": 15,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 0.196329,
+     "mac_corresponding": 0.217303,
+     "mac_first": 0.753312,
+     "mac_first_range_declared_scenarios": [
+      0.726739,
+      0.759989
+     ]
+    },
+    {
+     "corresponding_fe": 18,
+     "corresponding_hz": 213.1,
+     "exp": 11,
+     "first_fe": 18,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 11.220214,
+     "mac_corresponding": 0.944261,
+     "mac_first": 0.944261,
+     "mac_first_range_declared_scenarios": [
+      0.898352,
+      0.9565
+     ]
+    }
+   ],
+   "summary": {
+    "first_ranked_is_corresponding": 9,
+    "max_abs_frequency_error_pct": 12.460493,
+    "mean_abs_frequency_error_pct": 5.915051,
+    "mean_mac_first": 0.801926,
+    "records_mac_below_0_80": [
+     2,
+     3,
+     4,
+     8,
+     10
+    ],
+    "records_mac_ge_0_80": [
+     1,
+     5,
+     6,
+     7,
+     9,
+     11
+    ],
+    "records_outside_5_pct": [
+     2,
+     4,
+     7,
+     8,
+     11
+    ]
+   },
+   "title": "Thickness only (wedge)"
+  },
+  {
+   "fe_hz": [
+    19.018,
+    52.229,
+    60.811,
+    64.817,
+    71.711,
+    111.79,
+    144.26,
+    154.71,
+    167.45,
+    176.83,
+    194.82,
+    210.07,
+    281.38,
+    282.86
+   ],
+   "identity": {
+    "fe_manifest_sha256": "179a6ef3019b5c39c37274d18fd76fa34321add1a5d092a1eb26b55ef3c6ebfa",
+    "inp_sha256": "bab9b7edd02c9175a41aeb21b22231ee83ebc2d42f0b8419e8b2bc99fc95d69e",
+    "odb_sha256": "4e0f4ef214ecb7b8983bd1aee4f1f08cd11c95fffbbd486ad81fa5e476027005"
+   },
+   "inputs": {
+    "E1_MPa": 56000.0,
+    "E2_MPa": 41000.0,
+    "G12_MPa": 5000.0,
+    "boundary": "free-free",
+    "density_t_per_mm3": 1.498e-09,
+    "mass_g": 118.36072,
+    "mesh": "S4R, 100 x 100 elements, 10 201 nodes",
+    "nu12": 0.05,
+    "plan_mm": [
+     301.0,
+     300.0
+    ],
+    "thickness": "uniform 0.875 mm",
+    "thickness_mm_at_x0_x301": [
+     0.875,
+     0.875
+    ]
+   },
+   "key": "DIRECTIONAL_ONLY",
+   "mac": [
+    [
+     0.967757,
+     0.001471,
+     0.009932,
+     0.002255,
+     0.00078,
+     0.000124,
+     4e-05,
+     0.000546,
+     3.6e-05,
+     3e-06,
+     0.00241,
+     0.000757,
+     0.000172,
+     5.9e-05
+    ],
+    [
+     3.6e-05,
+     0.970303,
+     0.003338,
+     0.018239,
+     0.000463,
+     0.001201,
+     0.001014,
+     7.3e-05,
+     0.00014,
+     2.3e-05,
+     2.8e-05,
+     0.000242,
+     3.1e-05,
+     1.1e-05
+    ],
+    [
+     0.000479,
+     0.016185,
+     0.68224,
+     0.256734,
+     0.000795,
+     0.000425,
+     0.000178,
+     0.000239,
+     0.00065,
+     0.000643,
+     9e-06,
+     0.00058,
+     3.3e-05,
+     0.000195
+    ],
+    [
+     0.000229,
+     0.009458,
+     0.411971,
+     0.562239,
+     0.003924,
+     0.004043,
+     0.000139,
+     0.000638,
+     0.000275,
+     5.7e-05,
+     0.000636,
+     0.00062,
+     0.000172,
+     3.8e-05
+    ],
+    [
+     0.003754,
+     0.000804,
+     0.000345,
+     0.000811,
+     0.985516,
+     3.5e-05,
+     7.9e-05,
+     3e-06,
+     4e-05,
+     0.000504,
+     0.000835,
+     9e-06,
+     3.7e-05,
+     3e-06
+    ],
+    [
+     5.6e-05,
+     0.004436,
+     0.002775,
+     0.002242,
+     0.000227,
+     0.989972,
+     1.9e-05,
+     6.2e-05,
+     0.000152,
+     1.1e-05,
+     0.001527,
+     0.000946,
+     1.1e-05,
+     8.3e-05
+    ],
+    [
+     0.001673,
+     0.000211,
+     0.000138,
+     6.7e-05,
+     0.000486,
+     0.002854,
+     0.789301,
+     0.182976,
+     0.001223,
+     0.006227,
+     0.004471,
+     5.6e-05,
+     4.7e-05,
+     0.00066
+    ],
+    [
+     0.004052,
+     0.000285,
+     0.000436,
+     0.00062,
+     2.2e-05,
+     0.000246,
+     0.16947,
+     0.806919,
+     0.000266,
+     0.000495,
+     0.000835,
+     0.000551,
+     0.00108,
+     0.001029
+    ],
+    [
+     7.8e-05,
+     6.6e-05,
+     0.000554,
+     3.8e-05,
+     6.3e-05,
+     0.00063,
+     0.001106,
+     0.000665,
+     0.979625,
+     0.000636,
+     0.004646,
+     0.000475,
+     4.2e-05,
+     0.000464
+    ],
+    [
+     0.012584,
+     2e-06,
+     2.2e-05,
+     0.000128,
+     0.001272,
+     5.9e-05,
+     0.002308,
+     0.005182,
+     2e-05,
+     0.968513,
+     0.007715,
+     0.000302,
+     0.000551,
+     1.1e-05
+    ],
+    [
+     5.8e-05,
+     0.000377,
+     0.00037,
+     1.9e-05,
+     0.001766,
+     0.000988,
+     0.009808,
+     0.001959,
+     0.005062,
+     0.009675,
+     0.958741,
+     0.012987,
+     0.001059,
+     0.000367
+    ]
+   ],
+   "origin": "one owner-authorised solve and one ODB extraction (README 25)",
+   "readme": "25",
+   "records": [
+    {
+     "corresponding_fe": 7,
+     "corresponding_hz": 19.018,
+     "exp": 1,
+     "first_fe": 7,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 2.078949,
+     "mac_corresponding": 0.967757,
+     "mac_first": 0.967757,
+     "mac_first_range_declared_scenarios": [
+      0.958023,
+      0.972857
+     ]
+    },
+    {
+     "corresponding_fe": 8,
+     "corresponding_hz": 52.229,
+     "exp": 2,
+     "first_fe": 8,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -4.376241,
+     "mac_corresponding": 0.970303,
+     "mac_first": 0.970303,
+     "mac_first_range_declared_scenarios": [
+      0.959054,
+      0.971908
+     ]
+    },
+    {
+     "corresponding_fe": 9,
+     "corresponding_hz": 60.811,
+     "exp": 3,
+     "first_fe": 9,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -4.22714,
+     "mac_corresponding": 0.68224,
+     "mac_first": 0.68224,
+     "mac_first_range_declared_scenarios": [
+      0.672483,
+      0.684399
+     ]
+    },
+    {
+     "corresponding_fe": 10,
+     "corresponding_hz": 64.817,
+     "exp": 4,
+     "first_fe": 10,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -3.036303,
+     "mac_corresponding": 0.562239,
+     "mac_first": 0.562239,
+     "mac_first_range_declared_scenarios": [
+      0.551801,
+      0.563838
+     ]
+    },
+    {
+     "corresponding_fe": 11,
+     "corresponding_hz": 71.711,
+     "exp": 5,
+     "first_fe": 11,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -3.373857,
+     "mac_corresponding": 0.985516,
+     "mac_first": 0.985516,
+     "mac_first_range_declared_scenarios": [
+      0.966539,
+      0.990828
+     ]
+    },
+    {
+     "corresponding_fe": 12,
+     "corresponding_hz": 111.79,
+     "exp": 6,
+     "first_fe": 12,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -0.423558,
+     "mac_corresponding": 0.989972,
+     "mac_first": 0.989972,
+     "mac_first_range_declared_scenarios": [
+      0.970734,
+      0.993576
+     ]
+    },
+    {
+     "corresponding_fe": 13,
+     "corresponding_hz": 144.26,
+     "exp": 7,
+     "first_fe": 13,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -1.14824,
+     "mac_corresponding": 0.789301,
+     "mac_first": 0.789301,
+     "mac_first_range_declared_scenarios": [
+      0.772679,
+      0.790616
+     ]
+    },
+    {
+     "corresponding_fe": 14,
+     "corresponding_hz": 154.71,
+     "exp": 8,
+     "first_fe": 14,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -1.989744,
+     "mac_corresponding": 0.806919,
+     "mac_first": 0.806919,
+     "mac_first_range_declared_scenarios": [
+      0.761594,
+      0.831044
+     ]
+    },
+    {
+     "corresponding_fe": 15,
+     "corresponding_hz": 167.45,
+     "exp": 9,
+     "first_fe": 15,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -1.025439,
+     "mac_corresponding": 0.979625,
+     "mac_first": 0.979625,
+     "mac_first_range_declared_scenarios": [
+      0.961608,
+      0.98004
+     ]
+    },
+    {
+     "corresponding_fe": 16,
+     "corresponding_hz": 176.83,
+     "exp": 10,
+     "first_fe": 16,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -1.835465,
+     "mac_corresponding": 0.968513,
+     "mac_first": 0.968513,
+     "mac_first_range_declared_scenarios": [
+      0.945017,
+      0.970469
+     ]
+    },
+    {
+     "corresponding_fe": 17,
+     "corresponding_hz": 194.82,
+     "exp": 11,
+     "first_fe": 17,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 1.679597,
+     "mac_corresponding": 0.958741,
+     "mac_first": 0.958741,
+     "mac_first_range_declared_scenarios": [
+      0.923732,
+      0.965624
+     ]
+    }
+   ],
+   "summary": {
+    "first_ranked_is_corresponding": 11,
+    "max_abs_frequency_error_pct": 4.376241,
+    "mean_abs_frequency_error_pct": 2.290412,
+    "mean_mac_first": 0.878284,
+    "records_mac_below_0_80": [
+     3,
+     4,
+     7
+    ],
+    "records_mac_ge_0_80": [
+     1,
+     2,
+     5,
+     6,
+     8,
+     9,
+     10,
+     11
+    ],
+    "records_outside_5_pct": []
+   },
+   "title": "Directional stiffness only (E2 = 41 000 MPa)"
+  },
+  {
+   "fe_hz": [
+    18.943,
+    51.745,
+    60.448,
+    64.638,
+    71.291,
+    111.15,
+    141.13,
+    155.63,
+    166.38,
+    175.7,
+    193.91,
+    208.74,
+    273.55,
+    279.7
+   ],
+   "identity": {
+    "fe_manifest_sha256": "b6b61812db542aa27741db1fbeb6b4f9dbd0d4271050741046a2f22b88049ad6",
+    "inp_sha256": "819de8555787342ae0e0026465405fbaab7de8566e231f48bec04782eb232848",
+    "odb_sha256": "fefb87e5eca986ac1d8bf1ed5e04c61e7cff8f9749969633b3a958bb457bcccb"
+   },
+   "inputs": {
+    "E1_MPa": 56000.0,
+    "E2_MPa": 41000.0,
+    "G12_MPa": 5000.0,
+    "boundary": "free-free",
+    "density_t_per_mm3": 1.498e-09,
+    "mass_g": 117.68438,
+    "mesh": "S4R, 100 x 100 elements, 10 201 nodes",
+    "nu12": 0.05,
+    "plan_mm": [
+     301.0,
+     300.0
+    ],
+    "thickness": "0.81 mm at X = 0 to 0.93 mm at X = 301, linear in X (the archived wedge values reflected in the input)",
+    "thickness_mm_at_x0_x301": [
+     0.81,
+     0.93
+    ]
+   },
+   "key": "COMBINED",
+   "mac": [
+    [
+     0.97054,
+     0.001323,
+     0.009793,
+     0.002625,
+     0.000258,
+     9.6e-05,
+     5.3e-05,
+     0.000653,
+     2e-05,
+     2e-06,
+     0.002384,
+     0.000728,
+     0.000187,
+     0.000141
+    ],
+    [
+     2.8e-05,
+     0.98988,
+     0.003199,
+     0.001383,
+     0.000467,
+     0.001075,
+     0.001037,
+     3.1e-05,
+     0.00012,
+     3.3e-05,
+     3.4e-05,
+     0.000201,
+     8e-06,
+     3.5e-05
+    ],
+    [
+     0.000416,
+     0.003256,
+     0.716798,
+     0.23527,
+     0.000731,
+     0.000703,
+     0.000121,
+     0.00029,
+     0.000438,
+     0.00064,
+     2.1e-05,
+     0.000602,
+     0.000104,
+     3.6e-05
+    ],
+    [
+     0.000247,
+     0.020296,
+     0.376067,
+     0.583665,
+     0.003969,
+     0.005645,
+     0.000247,
+     0.000472,
+     0.000287,
+     5.9e-05,
+     0.000735,
+     0.000638,
+     2.7e-05,
+     0.000145
+    ],
+    [
+     0.006,
+     0.000654,
+     0.000317,
+     0.000957,
+     0.987001,
+     3.4e-05,
+     3.6e-05,
+     8.7e-05,
+     4.2e-05,
+     0.000232,
+     0.000797,
+     7e-06,
+     2.1e-05,
+     5.7e-05
+    ],
+    [
+     5.1e-05,
+     0.006203,
+     0.00318,
+     0.007721,
+     0.000228,
+     0.984474,
+     7.1e-05,
+     0.000119,
+     0.000153,
+     9e-06,
+     0.001465,
+     0.001747,
+     8e-05,
+     3e-06
+    ],
+    [
+     0.001791,
+     0.000171,
+     0.000139,
+     0.000128,
+     0.000483,
+     0.002865,
+     0.980718,
+     0.004464,
+     0.001217,
+     0.004712,
+     0.001131,
+     5.8e-05,
+     0.000743,
+     2.7e-05
+    ],
+    [
+     0.003954,
+     0.000175,
+     0.000399,
+     0.00073,
+     9e-06,
+     0.000263,
+     0.000727,
+     0.963612,
+     0.000292,
+     0.000876,
+     0.004702,
+     0.000536,
+     3e-06,
+     0.001048
+    ],
+    [
+     7.9e-05,
+     8.3e-05,
+     0.002072,
+     4.2e-05,
+     5.3e-05,
+     0.000612,
+     0.000493,
+     0.000749,
+     0.981362,
+     0.000611,
+     0.005082,
+     0.000512,
+     0.000845,
+     1.9e-05
+    ],
+    [
+     0.012943,
+     1e-06,
+     1.6e-05,
+     0.000127,
+     0.004077,
+     6.4e-05,
+     0.002897,
+     0.002088,
+     2.3e-05,
+     0.972581,
+     0.006414,
+     0.000313,
+     2e-06,
+     0.000333
+    ],
+    [
+     4e-05,
+     0.000345,
+     0.000318,
+     5.1e-05,
+     0.001593,
+     0.001235,
+     0.012295,
+     0.002359,
+     0.004965,
+     0.006784,
+     0.95116,
+     0.013054,
+     0.000266,
+     0.006361
+    ]
+   ],
+   "origin": "one owner-authorised solve and one ODB extraction (README 26)",
+   "readme": "26",
+   "records": [
+    {
+     "corresponding_fe": 7,
+     "corresponding_hz": 18.943,
+     "exp": 1,
+     "first_fe": 7,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 1.676388,
+     "mac_corresponding": 0.97054,
+     "mac_first": 0.97054,
+     "mac_first_range_declared_scenarios": [
+      0.963231,
+      0.973254
+     ]
+    },
+    {
+     "corresponding_fe": 8,
+     "corresponding_hz": 51.745,
+     "exp": 2,
+     "first_fe": 8,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -5.262375,
+     "mac_corresponding": 0.98988,
+     "mac_first": 0.98988,
+     "mac_first_range_declared_scenarios": [
+      0.977231,
+      0.991322
+     ]
+    },
+    {
+     "corresponding_fe": 9,
+     "corresponding_hz": 60.448,
+     "exp": 3,
+     "first_fe": 9,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -4.798839,
+     "mac_corresponding": 0.716798,
+     "mac_first": 0.716798,
+     "mac_first_range_declared_scenarios": [
+      0.709998,
+      0.717278
+     ]
+    },
+    {
+     "corresponding_fe": 10,
+     "corresponding_hz": 64.638,
+     "exp": 4,
+     "first_fe": 10,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -3.30408,
+     "mac_corresponding": 0.583665,
+     "mac_first": 0.583665,
+     "mac_first_range_declared_scenarios": [
+      0.572287,
+      0.58649
+     ]
+    },
+    {
+     "corresponding_fe": 11,
+     "corresponding_hz": 71.291,
+     "exp": 5,
+     "first_fe": 11,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -3.939781,
+     "mac_corresponding": 0.987001,
+     "mac_first": 0.987001,
+     "mac_first_range_declared_scenarios": [
+      0.970152,
+      0.990146
+     ]
+    },
+    {
+     "corresponding_fe": 12,
+     "corresponding_hz": 111.15,
+     "exp": 6,
+     "first_fe": 12,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -0.993635,
+     "mac_corresponding": 0.984474,
+     "mac_first": 0.984474,
+     "mac_first_range_declared_scenarios": [
+      0.96163,
+      0.991437
+     ]
+    },
+    {
+     "corresponding_fe": 13,
+     "corresponding_hz": 141.13,
+     "exp": 7,
+     "first_fe": 13,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -3.293021,
+     "mac_corresponding": 0.980718,
+     "mac_first": 0.980718,
+     "mac_first_range_declared_scenarios": [
+      0.954599,
+      0.981635
+     ]
+    },
+    {
+     "corresponding_fe": 14,
+     "corresponding_hz": 155.63,
+     "exp": 8,
+     "first_fe": 14,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -1.406915,
+     "mac_corresponding": 0.963612,
+     "mac_first": 0.963612,
+     "mac_first_range_declared_scenarios": [
+      0.932721,
+      0.965635
+     ]
+    },
+    {
+     "corresponding_fe": 15,
+     "corresponding_hz": 166.38,
+     "exp": 9,
+     "first_fe": 15,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -1.657883,
+     "mac_corresponding": 0.981362,
+     "mac_first": 0.981362,
+     "mac_first_range_declared_scenarios": [
+      0.962614,
+      0.981967
+     ]
+    },
+    {
+     "corresponding_fe": 16,
+     "corresponding_hz": 175.7,
+     "exp": 10,
+     "first_fe": 16,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": -2.462768,
+     "mac_corresponding": 0.972581,
+     "mac_first": 0.972581,
+     "mac_first_range_declared_scenarios": [
+      0.947366,
+      0.975355
+     ]
+    },
+    {
+     "corresponding_fe": 17,
+     "corresponding_hz": 193.91,
+     "exp": 11,
+     "first_fe": 17,
+     "first_unchanged_in_scenarios": "59/59",
+     "frequency_error_pct": 1.204654,
+     "mac_corresponding": 0.95116,
+     "mac_first": 0.95116,
+     "mac_first_range_declared_scenarios": [
+      0.909676,
+      0.958481
+     ]
+    }
+   ],
+   "summary": {
+    "first_ranked_is_corresponding": 11,
+    "max_abs_frequency_error_pct": 5.262375,
+    "mean_abs_frequency_error_pct": 2.727304,
+    "mean_mac_first": 0.916526,
+    "records_mac_below_0_80": [
+     3,
+     4
+    ],
+    "records_mac_ge_0_80": [
+     1,
+     2,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11
+    ],
+    "records_outside_5_pct": [
+     2
+    ]
+   },
+   "title": "Combined (wedge and E2 = 41 000 MPa)"
+  }
+ ],
+ "schema": "research/plate-0875/comparison-snapshot/v1",
+ "snapshot_id": "PLATE-0875-CURRENT-RESEARCH-VIEW-01",
+ "source_commits": {
+  "24": "2d52158",
+  "25": "0809f9c",
+  "26": "3a4af8b",
+  "27": "de543b1"
+ },
+ "sources": [
+  {
+   "name": "results_24",
+   "path": "abaqus-modal-comparator-work/research/PLATE_0875_SCAN_NORMALIZATION_FIX_01/results.json",
+   "sha256": "87b8e042e8846fc6b4ec3ad43c955ca0ef0a89a7036b3e83091eb50296b7d50c"
+  },
+  {
+   "name": "results_25",
+   "path": "abaqus-modal-comparator-work/research/PLATE_0875_DIRECTIONAL_FE_TEST_01/results.json",
+   "sha256": "f047f83367638c1356518ec1e0439911258d87ffe6982043c7b8b81e140d2e02"
+  },
+  {
+   "name": "results_26",
+   "path": "abaqus-modal-comparator-work/research/PLATE_0875_COMBINED_MODEL_01/results.json",
+   "sha256": "d539459fe6514d71a8e72a7c244e7faba9a82dc551900e39fe052ba965a2491e"
+  },
+  {
+   "name": "protocol_25",
+   "path": "abaqus-modal-comparator-work/research/PLATE_0875_DIRECTIONAL_FE_TEST_01/protocol.json",
+   "sha256": "e1b6b9db5a556a98d321132add5bcade45cd685041469fd210856961fd2ac747"
+  },
+  {
+   "name": "protocol_26",
+   "path": "abaqus-modal-comparator-work/research/PLATE_0875_COMBINED_MODEL_01/protocol.json",
+   "sha256": "b24e74b32d644d8670214e5eab3cfe59656dd11e85233889576068860f5da128"
+  },
+  {
+   "name": "corrected_reconstruction_27",
+   "path": "abaqus-modal-comparator-work/research/PSV_NORMALIZATION_INTEGRATION_01/plate_reconstruction_W301xH300_CORRECTED_instrument_metadata.json",
+   "sha256": "8047872aac94cd7f2aa91a3f5ec7db4667555ab31d23115824633c7e5270a237"
+  }
+ ],
+ "specimen": {
+  "experiment_sha256": "76db80aed1b4ba7062c0bf914cae85b55ea2665d80cb643c8cd54ba6c8bedc4d",
+  "key": "PLATE",
+  "modal_set": "Polymax_bravo",
+  "points": 289,
+  "records": 11,
+  "series": "NEXP29/PLATE300-1MM/S261027-ROTATED"
+ },
+ "status": {
+  "gates": [
+   "M8 GATE NOT_MET",
+   "D-077 NO_GLOBAL_PARAMETER_VALUE",
+   "production Auto-ID BLOCKED"
+  ],
+  "pairing": "no row is a confirmed mode pair; MATCH_CONFIRMED is given nowhere",
+  "use": "display only: not registration evidence, not an identification input, not a pairing record",
+  "values": "E2 = 41 000 MPa writes a bending stiffness ratio in a homogeneous shell; the wedge is an archived linear field between two edge means. Neither is a material property or an identified thickness"
+ },
+ "tracking": {
+  "lost": [
+   13,
+   14,
+   20
+  ],
+  "minimum_mac_for_tracked": 0.9,
+  "reference": "DIRECTIONAL_ONLY",
+  "rows": [
+   {
+    "mac": 0.998265,
+    "reference_fe": 7,
+    "reference_hz": 19.018,
+    "status": "TRACKED",
+    "target_fe": 7,
+    "target_hz": 18.943
+   },
+   {
+    "mac": 0.978418,
+    "reference_fe": 8,
+    "reference_hz": 52.229,
+    "status": "TRACKED",
+    "target_fe": 8,
+    "target_hz": 51.745
+   },
+   {
+    "mac": 0.99662,
+    "reference_fe": 9,
+    "reference_hz": 60.811,
+    "status": "TRACKED",
+    "target_fe": 9,
+    "target_hz": 60.448
+   },
+   {
+    "mac": 0.985107,
+    "reference_fe": 10,
+    "reference_hz": 64.817,
+    "status": "TRACKED",
+    "target_fe": 10,
+    "target_hz": 64.638
+   },
+   {
+    "mac": 0.998763,
+    "reference_fe": 11,
+    "reference_hz": 71.711,
+    "status": "TRACKED",
+    "target_fe": 11,
+    "target_hz": 71.291
+   },
+   {
+    "mac": 0.997807,
+    "reference_fe": 12,
+    "reference_hz": 111.79,
+    "status": "TRACKED",
+    "target_fe": 12,
+    "target_hz": 111.15
+   },
+   {
+    "mac": 0.827661,
+    "reference_fe": 13,
+    "reference_hz": 144.26,
+    "status": "LOST",
+    "target_fe": 13,
+    "target_hz": 141.13
+   },
+   {
+    "mac": 0.839304,
+    "reference_fe": 14,
+    "reference_hz": 154.71,
+    "status": "LOST",
+    "target_fe": 14,
+    "target_hz": 155.63
+   },
+   {
+    "mac": 0.998257,
+    "reference_fe": 15,
+    "reference_hz": 167.45,
+    "status": "TRACKED",
+    "target_fe": 15,
+    "target_hz": 166.38
+   },
+   {
+    "mac": 0.997606,
+    "reference_fe": 16,
+    "reference_hz": 176.83,
+    "status": "TRACKED",
+    "target_fe": 16,
+    "target_hz": 175.7
+   },
+   {
+    "mac": 0.983721,
+    "reference_fe": 17,
+    "reference_hz": 194.82,
+    "status": "TRACKED",
+    "target_fe": 17,
+    "target_hz": 193.91
+   },
+   {
+    "mac": 0.997079,
+    "reference_fe": 18,
+    "reference_hz": 210.07,
+    "status": "TRACKED",
+    "target_fe": 18,
+    "target_hz": 208.74
+   },
+   {
+    "mac": 0.99247,
+    "reference_fe": 19,
+    "reference_hz": 281.38,
+    "status": "TRACKED",
+    "target_fe": 20,
+    "target_hz": 279.7
+   },
+   {
+    "mac": 0.650485,
+    "reference_fe": 20,
+    "reference_hz": 282.86,
+    "status": "LOST",
+    "target_fe": 19,
+    "target_hz": 273.55
+   }
+  ],
+  "target": "COMBINED",
+  "tracked": 11
+ },
+ "unresolved_records": [
+  3,
+  4
+ ]
+}
