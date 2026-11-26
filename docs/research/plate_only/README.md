@@ -1,13 +1,13 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24; the prospective directional stiffness test of §22.8 solved with one owner-authorised Abaqus solve and one ODB extraction, all three criteria met, 2026-11-26, see §25; the combined model with the wedge thickness of §18 and the stiffness ratio of §25, one owner-authorised Abaqus solve and one ODB extraction, record 7 explained, records 3 and 4 not, one record outside ± 5 %, 2026-11-26, see §26; the instrument-metadata scan normalisation made the default of new reconstructions in the service and the tool, the earlier reading kept by explicit selection only, and the corrected plate reconstruction written under its own name, 2026-11-26, see §27; the four models of §24–§26 shown in the Research Results page from one separate hash-verified snapshot, the PRIORITY-1–4 plate tables named historical, 2026-11-26, see §28). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24; the prospective directional stiffness test of §22.8 solved with one owner-authorised Abaqus solve and one ODB extraction, all three criteria met, 2026-11-26, see §25; the combined model with the wedge thickness of §18 and the stiffness ratio of §25, one owner-authorised Abaqus solve and one ODB extraction, record 7 explained, records 3 and 4 not, one record outside ± 5 %, 2026-11-26, see §26; the instrument-metadata scan normalisation made the default of new reconstructions in the service and the tool, the earlier reading kept by explicit selection only, and the corrected plate reconstruction written under its own name, 2026-11-26, see §27; the four models of §24–§26 shown in the Research Results page from one separate hash-verified snapshot, the PRIORITY-1–4 plate tables named historical, 2026-11-26, see §28; that page reachable from the ordinary program by Help → Research Results in a separate read-only dialog, 2026-11-26, see §29). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No LM, parameter fit
 or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in four sections: one ODB
 extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction in each of §19, §25
 and §26. §1–§17 and
 §20–§24 ran no Abaqus; §21 reads experimental files only, §23 reads instrument records only, the others read
-existing FE results. §24, §27 and §28 are the only sections that change program code (`src/services/psv_video_registration.py`; in §27 also
-`tools/reconstruct_psv_registration.py`; in §28 the Research Results reader, model and page).
+existing FE results. §24, §27, §28 and §29 are the only sections that change program code (`src/services/psv_video_registration.py`; in §27 also
+`tools/reconstruct_psv_registration.py`; in §28 the Research Results reader, model and page; in §29 the program's window and the page's dialog).
 
 - **Scope (owner).** The sandwich panels are set aside. One specimen is studied: `PLATE-300x300x1mm`, series
   `NEXP29/PLATE300-1MM/S261027-ROTATED`.
@@ -3908,7 +3908,8 @@ are unchanged.
 separate, hash-verified snapshot. The PRIORITY-1–4 plate tables follow it, unchanged and named historical.
 **The page is not part of the program that `RUN_PROGRAM.cmd` starts:** that program has five pages and no Research
 Results. The view was checked in the research window (`python -m new_gui --research`). Whether and how the normal
-program offers it is an owner decision outside this task (§28.4).
+program offers it is an owner decision outside this task (§28.4). **Since §29 the ordinary program offers it by
+Help → Research Results...**
 
 ### 28.1 The snapshot
 
@@ -4028,6 +4029,112 @@ Changed in the repository: `src/services/research_results_reader.py`, `src/new_g
 `D:\git\abaqus-modal-comparator-work\research\PLATE_0875_CURRENT_RESEARCH_VIEW_01` (outside git):
 `build_snapshot.py`, `smoke.ps1` with `run_program_cmd_window.png` and `run_program_cmd_log.json`,
 `smoke_research.ps1` with `smoke_01_top.png` … `smoke_13_historical_inverse.png` and `smoke_log.json`, `tests.log`.
+
+## 29. PLATE-0875-RESEARCH-ACCESS-FIX-01 — the research results reachable from the ordinary program (2026-11-26)
+
+`RESEARCH_ONLY`, `PHYSICAL_REGISTRATION_NOT_VERIFIED`, `NOT_A_MATERIAL_PROPERTY`. An access task: no Abaqus, no
+extraction, no fit, no new number, no change to any snapshot or research result. M8 GATE NOT_MET, D-077
+`NO_GLOBAL_PARAMETER_VALUE` and production Auto-ID BLOCKED are unchanged.
+
+**Short answer.** The program that `RUN_PROGRAM.cmd` starts now has one command, **Help → Research Results...**. It
+opens the Research Results page of §28 in a separate window titled "Research Results - RESEARCH ONLY (read-only)".
+This closes the open point of §28.4: the required Windows check through `RUN_PROGRAM.cmd` was done (§29.4).
+The program still starts on Analyze with its five pages, and the research window `--research` is not the default.
+
+### 29.1 The access route
+
+| Part | What it is |
+|---|---|
+| Command | `Help → Research Results...` in `ProductionWindow`, after `About`. The menu bar is still File and Help; the five pages and the File menu are unchanged |
+| Dialog | `ResearchResultsDialog` (in `new_gui/research_results_panel.py`): its own window, not modal, with a Close button. It holds the same `ResearchResultsPanel` as the research window: the same snapshot, tables, model buttons and heat maps. Nothing was copied or rewritten |
+| Label | the title names it research and read-only; a note at the top, always in view, says: research only, read-only, nothing computed, solved, fitted or written, independent of the analysis open in the program, no material property, no confirmed mode pair, no verified registration |
+| Lazy | the program's window does not import the page. The import and the reading of the records happen inside the command, the first time it is chosen. A second choice shows the same dialog |
+| Close | Close or the window's own button hides the dialog; the program is as it was, on the page it was on. Closing the program closes the dialog |
+
+### 29.2 Separation that is kept
+
+- **Nothing of the analysis goes in.** The dialog is given no file identity, no result and no registration; the
+  window calls only show, raise, activate and close on it. The link banner of the page therefore always reads
+  "NOT VERIFIED FOR CURRENT WORKSPACE INPUTS" in this dialog, and its note says so. Choosing files, analysing or
+  closing a project does not change what the dialog shows (tested).
+- **Nothing comes out.** No analysis, registration, pairing or identification code reads the dialog or the
+  snapshot; the test of §28.3 that no other program code reads the snapshot still passes.
+- **The restrictions of §28 are unchanged:** the four labels, the failed ± 5 % criterion (EXP 2, −5.26 %), EXP 3 and
+  EXP 4 unresolved, FE 13 / FE 14 / FE 20 LOST, the conditional transfer, and the three HISTORICAL notes.
+- **A missing, damaged or changed snapshot** is refused in the dialog with its reason; no table, matrix or model
+  button of section A is shown, and the historical tables stay under their note. With nothing to read at all, the
+  dialog still opens, shows both refusals and closes.
+- **Not restored:** the research window (`python -m new_gui --research`) is still reached only by its option, and
+  `RUN_PROGRAM.cmd` still refuses it. No earlier page was added to the program's navigation.
+
+### 29.3 Tests
+
+Two separation tests were adjusted, each only for this route; nothing else in them was weakened.
+
+| Test | Adjustment |
+|---|---|
+| `tests/test_universal_two_file_analysis.py`, "no specimen or plate wording" | `production_window.py` may name the page module exactly once, and that one place must be the import inside the command. Every other forbidden word stays forbidden in every listed file |
+| `tests/test_universal_ui2_clean.py`, forbidden window text | the text of the one Help command is allowed, as "Research Tuning" already was. The menu test now also requires Help to be exactly About and Research Results..., and that no dialog exists before the command is chosen |
+
+Not adjusted: "no earlier page module is loaded by the program window" passes as it was, since importing the
+window still loads none of them.
+
+New in `tests.test_priority5_research_results` (`ProgramAccessTests`, 6 tests; 32 in the module):
+
+| Required | Tests |
+|---|---|
+| Ordinary program startup | five pages, Analyze shown, no dialog; in a fresh interpreter the window is built and shown without the page's panel, model and reader modules, and the command then loads them |
+| Explicit research dialog access | the Help command opens the dialog: its title, its note, not modal, no editable field or table; the page with the snapshot's recorded SHA-256, the labels, the failed criterion, the unresolved records, the LOST rows and the three HISTORICAL notes; the program still on Analyze, its analysis state unchanged; the command shows the same dialog again |
+| Four models, 11 × 14 | each of the four buttons: one checked, an 11 × 14 heat map whose 154 cells equal the snapshot's matrix of that model, FE7–FE20, 11 records; the four matrices differ |
+| Missing or damaged snapshot | missing, truncated, changed (`FAIL` → `PASS`) and empty file: refusal with its reason, no current table, matrix or visible model button, the historical table kept; an empty folder: both refusals, the dialog opens and closes |
+| No calculation or process | opening the dialog, the four models and the three specimens call no `subprocess.Popen`, `subprocess.run`, `os.startfile` or `os.system` |
+| Independence | the page's workspace stays empty while the program's analysis changes, pages are changed and the project is closed; the window's code makes no data call on the dialog |
+| Close | Close hides the dialog, the program stays on its page, all five pages respond, the command reopens it, closing the program closes it |
+
+Regression (one module at a time): 29 modules pass: `test_priority5_research_results` 32, `test_universal_ui2_clean` 27, `test_universal_two_file_analysis` 44, `test_new_gui1_workspace` 28, `test_priority6_sp10_fe_shapes` 8, `test_priority7_sp10_research` 23, `test_windows_portable_rc1` / `rc2` / `rc3` 4 / 6 / 5, `test_working_draft_r1` 6, `test_working_draft_r2_project` 72, `test_gui_ux5_usability` 30, `test_process_shutdown` 1, `test_abm_aud3_rotated_registration` 40, `test_abm_aud4_modal_comparison` 23, `test_abm_aud5_ritz_estimation` 66, `test_mat3_materials_study` 57, `test_mat4_ux1_materials_gui` 55, `test_new_gui_trial_mac_qt` 39, `test_real_fit_r1_tuning` 63, `test_real_fit_r2_stability` 13, `test_real_input_1_compatibility` 17, `test_research_tuning_solid_gui` 16, `test_ritz_abaqus_export` 18, `test_sandwich_sp13_trial` 54, `test_universal_reg1_registration` 58, `test_universal_reg2_draft` 61, `test_universal_reg3_confirmed` 46, `test_plate_physical_review` 36; no skip.
+
+**One failure, present before this task:** `test_gui_ux_r1` 99 of 100. `test_no_page_scrolls_sideways_at_the_usual_sizes` fails for the Research Tuning page at 900 × 680 (horizontal scroll range 131). The same test fails identically with this task's changes set aside; it concerns a page this task does not touch, and it was left as it is.
+
+### 29.4 Windows check through `RUN_PROGRAM.cmd`
+
+Interface tested: NEW_GUI, the ordinary program (`ProductionWindow`), started by `RUN_PROGRAM.cmd` with no option. LEGACY_GUI was not tested.
+
+| Step | Result |
+|---|---|
+| `RUN_PROGRAM.cmd` | the program window opens on Analyze; the five pages; no research dialog exists |
+| Help | the menu shows About and Research Results... |
+| Research Results... | the dialog "Research Results - RESEARCH ONLY (read-only)" opens with its note; the program behind it is still on Analyze |
+| Content | section A with the snapshot SHA-256 `dc2ac694…` "verified when this page was read", no refusal; 287.1 × 285.3 mm, transfer CONDITIONAL; the link banner NOT VERIFIED |
+| Baseline | button checked alone; matrix 11 × 14; EXP2 × FE8 = 0.45 |
+| Thickness only | button checked alone; matrix 11 × 14; EXP2 × FE8 = 0.54 |
+| Directional only | button checked alone; matrix 11 × 14; EXP2 × FE8 = 0.97 |
+| Combined | button checked alone; matrix 11 × 14; EXP2 × FE8 = 0.99 |
+| Restrictions | criteria with "FAIL — outside: EXP2; largest \|Δf\| 5.26 %"; limitations with EXP 3 / EXP 4 and the LOST branches; the three HISTORICAL notes |
+| Close | the dialog is gone; the program window is there, on Analyze |
+| Ordinary program | Review is shown when chosen, then Analyze again |
+| End | the window is closed; exit code 0; no process left |
+
+- **Method.** UI Automation only: the Help menu by its expand pattern, the command and the buttons by Invoke, scrolling by the scroll bar's value; no mouse, no keyboard. The script found the foreground window unchanged at each of its checks (0 of 0 to give back); the Help menu was open for a moment between two checks.
+- 20 screenshots and the log are in the work directory (§29.6). The open Help menu itself was not captured: the script found no separate window for it; its two items were read through UI Automation.
+
+### 29.5 What is still open
+
+| Item | State |
+|---|---|
+| **Portable builds** (`packaging/portable_rc*/`) | unchanged and not rebuilt. Whether a new build carries `plate_comparison_261027.json` was not checked; without it the dialog shows the refusal "is missing" for section A |
+| Link banner wording | says "Workspace", a word the ordinary program does not use. It comes from the reader, which is outside the allowed files; the dialog's note explains it |
+| "Load local research record..." | the page's button is available in the dialog as in the research window. It only reads a JSON file the user chooses and shows it under the HISTORICAL note |
+| The other stale consumers of §28.5 | unchanged, except the first row: the ordinary program now offers the page |
+
+### 29.6 Files
+
+Changed in the repository: `src/new_gui/production_window.py`, `src/new_gui/research_results_panel.py`,
+`tests/test_priority5_research_results.py`, `tests/test_universal_ui2_clean.py`,
+`tests/test_universal_two_file_analysis.py` and this report.
+
+`D:\git\abaqus-modal-comparator-work\research\PLATE_0875_RESEARCH_ACCESS_FIX_01` (outside git): `smoke.ps1`,
+`smoke_log.json`, the screenshots `smoke_01_program_start.png` … `smoke_15_program_analyze_after_close.png`,
+`tests.log` and one log per test module.
 
 ## Not changed
 

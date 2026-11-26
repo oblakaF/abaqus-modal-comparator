@@ -4,6 +4,10 @@ GUI-UX-R1: four pages: Analyze, Review, MAC / Points and Materials, each with it
 
 It imports none of the earlier pages, so nothing of them can appear here. ``new_gui.window.MainWindow`` keeps them and
 opens only with an explicit command-line option (``new_gui.__main__``).
+
+RESEARCH-ACCESS-FIX-01: one explicit route to stored research records, Help > Research Results. It opens a
+separate read-only dialog; its module is imported and its records are read only when the command is chosen. The dialog
+is given nothing of the analysis and returns nothing to it.
 """
 
 from __future__ import annotations
@@ -34,6 +38,7 @@ TUNING_SUBTITLE = ("Research only: tune the assumed CFRP inputs of an Abaqus she
                    "Kirchhoff-Ritz surrogate. No Abaqus run; the result is not a material property.")
 MAC_SUBTITLE = "Mode pairs and MAC, what they rest on, and why they may be missing. Nothing here is computed from a manual choice."
 MATERIALS_PAGE_SUBTITLE = "Synthetic test of the two model methods, and a read-only view of ODB and UNV/UFF files. No material value is issued."
+RESEARCH_ACTION = "Research Results..."
 ABOUT = ("Choose an Abaqus .odb and an experimental .unv or .uff, then click Analyze. Mode pairs and MAC appear only "
          "with a verified physical registration; otherwise the result is a frequency comparison. No FE analysis is "
          "solved.")
@@ -87,6 +92,7 @@ class ProductionWindow(QMainWindow):
         self.mac_points = MacPointsPanel(self.analyze)
         self.materials_workspace = MaterialsWorkspace(self.analyze, self.materials)
         self.research_tuning = ResearchTuningPanel(registered_source=self._registered_source)  # ABM-AUD-5
+        self.research_dialog = None  # made on the first Help > Research Results; nothing of it is read before
         self.analyze.route_project = self._route_project
         central = QWidget()
         root = QHBoxLayout(central)
@@ -170,7 +176,23 @@ class ProductionWindow(QMainWindow):
         menu.addAction(close)
         about = QAction("About", self)
         about.triggered.connect(lambda: QMessageBox.about(self, APP_NAME, f"{APP_NAME}\n\n{ABOUT}"))
-        self.menuBar().addMenu("&Help").addAction(about)
+        help_menu = self.menuBar().addMenu("&Help")
+        help_menu.addAction(about)
+        self.research_action = QAction(RESEARCH_ACTION, self)
+        self.research_action.triggered.connect(lambda: self.show_research_dialog())
+        help_menu.addAction(self.research_action)
+
+    def show_research_dialog(self):
+        """Stored research records in their own read-only window: imported and read here, on request, never at
+        start-up. Nothing of the analysis is passed in; the pages and the open analysis stay as they are."""
+        if self.research_dialog is None:
+            from new_gui.research_results_panel import ResearchResultsDialog
+
+            self.research_dialog = ResearchResultsDialog(self)
+        self.research_dialog.show()
+        self.research_dialog.raise_()
+        self.research_dialog.activateWindow()
+        return self.research_dialog
 
     def _fit_to_screen(self) -> None:
         screen = self.screen() or QGuiApplication.primaryScreen()
@@ -247,8 +269,10 @@ class ProductionWindow(QMainWindow):
         self.mac_points.shutdown()
         self.materials_workspace.shutdown()
         self.research_tuning.shutdown()
+        if self.research_dialog is not None:
+            self.research_dialog.close()
         QApplication.instance().removeEventFilter(self.wheel_guard)
         super().closeEvent(event)
 
 
-__all__ = ["ANALYZE_PAGE", "MAC_PAGE", "MATERIALS_PAGE", "PAGES", "ProductionWindow", "REVIEW_PAGE", "TUNING_PAGE"]
+__all__ = ["ANALYZE_PAGE", "MAC_PAGE", "MATERIALS_PAGE", "PAGES", "ProductionWindow", "RESEARCH_ACTION", "REVIEW_PAGE", "TUNING_PAGE"]

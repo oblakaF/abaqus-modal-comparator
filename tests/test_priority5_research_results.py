@@ -631,5 +631,240 @@ class PageTests(unittest.TestCase):
             self.assertTrue([w for w in panel.findChildren(type(panel.banner)) if w.objectName() == "plateHistoricalMatching"])
 
 
+@unittest.skipUnless(HAVE_QT or os.environ.get("NEW_GUI_REQUIRE_QT") == "1", "PySide6 is not installed")
+class ProgramAccessTests(unittest.TestCase):
+    """PLATE-0875-RESEARCH-ACCESS-FIX-01: Help > Research Results in the program's window opens the page in a separate
+    read-only dialog; nothing of it is loaded before, and nothing of the analysis goes in or comes out."""
+
+    def setUp(self):
+        from new_gui import production_window as pw
+        from new_gui.theme import create_application
+
+        self.pw = pw
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.folder = Path(directory.name)
+        patch = mock.patch.dict(os.environ, {"LOCALAPPDATA": directory.name})
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.app = QApplication.instance() or create_application([])
+        self.window = pw.ProductionWindow()
+        self.window.resize(1366, 768)
+        self.window.show()
+        self.addCleanup(self.window.deleteLater)
+        self.addCleanup(self.window.close)
+        self.app.processEvents()
+
+    def _open(self):
+        self.window.research_action.trigger()
+        self.app.processEvents()
+        return self.window.research_dialog
+
+    def _copy(self, *, without=()):
+        root = self.folder / f"root{len(list(self.folder.iterdir()))}"
+        for relative in [v[0] for v in rr.SNAPSHOT_FILES.values()] + [rr.PLATE_COMPARISON_FILE[0]]:
+            if relative in without:
+                continue
+            (root / relative).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, root / relative)
+        return root
+
+    @staticmethod
+    def _named(widget, name):
+        return [w for w in widget.findChildren(type(widget.panel.banner)) if w.objectName() == name]
+
+    def test_the_program_starts_as_before_and_loads_nothing_of_the_research_page(self):
+        window = self.window
+        self.assertEqual(self.pw.PAGES, ("Analyze", "Review", "MAC / Points", "Materials", "Research Tuning"))
+        self.assertEqual([window.nav.button(i).text() for i in range(5)], list(self.pw.PAGES))
+        self.assertEqual(window.stack.count(), 5)
+        self.assertEqual(window.stack.currentIndex(), self.pw.ANALYZE_PAGE)
+        self.assertIsNone(window.research_dialog)
+        self.assertEqual([a.text() for a in window.menuBar().actions()], ["&File", "&Help"])
+        self.assertEqual([a.text() for a in window.menuBar().actions()[1].menu().actions()],
+                         ["About", self.pw.RESEARCH_ACTION])
+        # a fresh interpreter: the window is built and shown without the page's modules; the command loads them
+        code = ("import os, sys, tempfile; sys.path.insert(0, 'src'); "
+                "os.environ['LOCALAPPDATA'] = tempfile.mkdtemp(); "
+                "from new_gui.theme import create_application; app = create_application([]); "
+                "from new_gui.production_window import ProductionWindow; w = ProductionWindow(); w.show(); "
+                "app.processEvents(); names = ('new_gui.research_results_panel', 'new_gui.research_results_model', "
+                "'services.research_results_reader'); print([n in sys.modules for n in names]); "
+                "d = w.show_research_dialog(); app.processEvents(); print([n in sys.modules for n in names]); "
+                "print(d.panel.comparison is not None, w.stack.currentIndex()); w.close()")
+        import subprocess
+
+        done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True, timeout=180,
+                              env={**os.environ, "QT_QPA_PLATFORM": "offscreen"})
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(done.stdout.split("\n")[:3],
+                         ["[False, False, False]", "[True, True, True]", "True 0"], done.stdout)
+
+    def test_help_research_results_opens_a_labelled_read_only_dialog_and_starts_nothing(self):
+        from PySide6.QtWidgets import QAbstractItemView, QLineEdit, QPlainTextEdit, QTableWidget, QTextEdit
+        from new_gui import research_results_panel as panel_module
+
+        window = self.window
+        state, inputs = window.analyze.state, window.analyze.inputs
+        with mock.patch("subprocess.Popen") as popen, mock.patch("subprocess.run") as run, \
+                mock.patch("os.startfile", create=True) as start, mock.patch("os.system") as system:
+            dialog = self._open()
+            for key in rr.PLATE_MODELS:
+                dialog.panel.plate_buttons[key].click()
+            for specimen in ("SP-13", "SP-10", "PLATE"):
+                dialog.panel.set_specimen(specimen)
+            self.app.processEvents()
+            for called in (popen, run, start, system):
+                called.assert_not_called()
+        self.assertIsInstance(dialog, panel_module.ResearchResultsDialog)
+        self.assertTrue(dialog.isVisible())
+        self.assertFalse(dialog.isModal())
+        self.assertIs(dialog.parent(), window)
+        self.assertEqual(dialog.windowTitle(), "Research Results - RESEARCH ONLY (read-only)")
+        for words in ("RESEARCH ONLY", "READ-ONLY", "independent of the analysis", "nothing is computed",
+                      "gives nothing to analysis, registration or identification", "material property"):
+            self.assertIn(words, dialog.note.text())
+        self.assertTrue(dialog.note.isVisibleTo(dialog))
+        # read-only: no editable field and no editable table anywhere in it
+        self.assertEqual(dialog.findChildren(QLineEdit) + dialog.findChildren(QTextEdit)
+                         + dialog.findChildren(QPlainTextEdit), [])
+        for table in dialog.findChildren(QTableWidget):
+            self.assertEqual(table.editTriggers(), QAbstractItemView.EditTrigger.NoEditTriggers, table.objectName())
+        # the page and its restrictions, unchanged
+        page = dialog.panel
+        self.assertEqual(page.specimen(), "PLATE")
+        self.assertIsNotNone(page.snapshot)
+        self.assertIsNotNone(page.comparison)
+        self.assertEqual(page.comparison.sha256, rr.PLATE_COMPARISON_FILE[1])
+        for label in ("RESEARCH_ONLY", "PHYSICAL_REGISTRATION_NOT_VERIFIED", "NOT_A_MATERIAL_PROPERTY"):
+            self.assertIn(label, page.plate_status.text())
+        self.assertIn("FAIL — outside: EXP2", self._named(dialog, "plateCriteria")[0].text())
+        self.assertIn("EXP 3 and EXP 4 are not explained", self._named(dialog, "plateLimitations")[0].text())
+        self.assertIn("LOST", " ".join(page.tables["plate_tracking"].item(r, c).text()
+                                       for r in range(14) for c in range(page.tables["plate_tracking"].columnCount())))
+        for name in ("plateHistoricalMatching", "plateHistoricalMac", "plateHistoricalInverse"):
+            labels = self._named(dialog, name)
+            self.assertEqual(len(labels), 1, name)
+            self.assertTrue(labels[0].text().startswith("HISTORICAL"), name)
+        # the ordinary program is as it was
+        self.assertEqual(window.stack.count(), 5)
+        self.assertEqual(window.stack.currentIndex(), self.pw.ANALYZE_PAGE)
+        self.assertEqual((window.analyze.state, window.analyze.inputs), (state, inputs))
+        self.assertIs(self._open(), dialog)  # the command shows the same dialog again
+
+    def test_the_dialog_is_independent_of_the_analysis_project(self):
+        window = self.window
+        dialog = self._open()
+        page = dialog.panel
+        self.assertEqual((page.workspace, page.context), ((None, None), None))
+        self.assertTrue(page.banner.text().startswith(rr.NOT_VERIFIED_BANNER))
+        before = (page.banner.text(), page.tables["plate_frequencies"].item(1, 1).text())
+        with mock.patch.object(type(page), "set_workspace") as given:
+            window.analyze.changed.emit()  # what a chosen file, an analysis or a project does to the window
+            for index in range(5):
+                window.show_page(index)
+            window.project_actions["close"].trigger()
+            self.app.processEvents()
+            given.assert_not_called()
+        self.assertEqual((page.workspace, page.context), ((None, None), None))
+        self.assertEqual((page.banner.text(), page.tables["plate_frequencies"].item(1, 1).text()), before)
+        self.assertTrue(dialog.isVisible())
+        # and nothing of the dialog is a page of the program or reaches its analysis
+        self.assertFalse(window.stack.isAncestorOf(dialog))
+        source = (ROOT / "src" / "new_gui" / "production_window.py").read_text(encoding="utf-8")
+        self.assertEqual(source.count("research_dialog."), 4)  # show, raise, activate and close: no data call
+        for word in ("set_workspace", "comparison", "snapshot.", "load_record"):
+            self.assertNotIn(word, source.split("def show_research_dialog")[1].split("def _fit_to_screen")[0])
+
+    def test_all_four_models_and_their_11_by_14_matrices(self):
+        dialog = self._open()
+        page = dialog.panel
+        self.assertEqual(list(page.plate_buttons), list(rr.PLATE_MODELS))
+        self.assertEqual(len(rr.PLATE_MODELS), 4)
+        shown = {}
+        for key in rr.PLATE_MODELS:
+            page.plate_buttons[key].click()
+            self.app.processEvents()
+            self.assertEqual([k for k, b in page.plate_buttons.items() if b.isChecked()], [key])
+            heatmap = page.plate_heatmap
+            self.assertEqual((heatmap.rowCount(), heatmap.columnCount()), (11, 14), key)
+            model = page.comparison.models[key]
+            self.assertEqual((len(model.mac), {len(row) for row in model.mac}), (11, {14}), key)
+            texts = tuple(tuple(heatmap.item(r, c).text() for c in range(14)) for r in range(11))
+            self.assertEqual(texts, tuple(tuple(f"{v:.2f}" for v in row) for row in model.mac), key)
+            self.assertEqual([heatmap.horizontalHeaderItem(c).text().split("\n")[0] for c in range(14)],
+                             [f"FE{n}" for n in range(7, 21)], key)
+            self.assertEqual(page.tables["plate_records"].rowCount(), 11, key)
+            shown[key] = texts
+        self.assertEqual(len(set(shown.values())), 4)  # four different matrices, not one shown four times
+        self.assertEqual({k: v[1][1] for k, v in shown.items()},
+                         {"BASELINE": "0.45", "THICKNESS_ONLY": "0.54", "DIRECTIONAL_ONLY": "0.97", "COMBINED": "0.99"})
+
+    def test_a_missing_or_damaged_snapshot_is_refused_in_the_dialog(self):
+        from new_gui.research_results_panel import ResearchResultsDialog
+
+        plate = rr.PLATE_COMPARISON_FILE[0]
+        cases = {"missing": (self._copy(without=(plate,)), "is missing"),
+                 "damaged": (self._copy(), "SHA-256"),
+                 "changed": (self._copy(), "SHA-256"),
+                 "empty": (self._copy(), "SHA-256")}
+        target = cases["damaged"][0] / plate
+        target.write_bytes(target.read_bytes()[:2000])
+        target = cases["changed"][0] / plate
+        target.write_bytes(target.read_bytes().replace(b'"FAIL"', b'"PASS"'))
+        (cases["empty"][0] / plate).write_bytes(b"")
+        for name, (root, reason) in cases.items():
+            with self.subTest(case=name):
+                dialog = ResearchResultsDialog(self.window, root=root)
+                self.addCleanup(dialog.deleteLater)
+                dialog.show()
+                self.app.processEvents()
+                page = dialog.panel
+                self.assertIsNone(page.comparison)
+                self.assertTrue(page.comparison_error.startswith(rm.PLATE_REFUSED), page.comparison_error)
+                self.assertIn(reason, page.comparison_error)
+                refused = self._named(dialog, "plateCurrentRefused")
+                self.assertEqual(len(refused), 1)
+                self.assertTrue(refused[0].isVisibleTo(dialog))
+                self.assertIsNone(page.plate_heatmap)
+                self.assertEqual([k for k in page.tables if k.startswith("plate_")], [])
+                self.assertEqual([k for k, b in page.plate_buttons.items() if b.isVisibleTo(dialog)], [])
+                self.assertIn("RESEARCH ONLY", dialog.note.text())
+                self.assertEqual(page.tables["matching"].rowCount(), 11)  # historical, under its note
+                self.assertEqual(len(self._named(dialog, "plateHistoricalMatching")), 1)
+                dialog.close()
+        # nothing at all to read: both refusals shown, the dialog still opens and closes, the program is untouched
+        dialog = ResearchResultsDialog(self.window, root=self.folder / "absent")
+        self.addCleanup(dialog.deleteLater)
+        dialog.show()
+        self.app.processEvents()
+        self.assertIsNone(dialog.panel.snapshot)
+        self.assertIn("is not shown", dialog.panel.snapshot_error)
+        self.assertIn("is missing", dialog.panel.comparison_error)
+        self.assertEqual(dialog.panel.tables, {})
+        dialog.close()
+        self.assertEqual(self.window.stack.currentIndex(), self.pw.ANALYZE_PAGE)
+
+    def test_closing_the_dialog_returns_to_the_program(self):
+        window = self.window
+        window.show_page(self.pw.MATERIALS_PAGE)
+        dialog = self._open()
+        self.assertEqual(window.stack.currentIndex(), self.pw.MATERIALS_PAGE)  # the page in use stays
+        dialog.close_button.click()
+        self.app.processEvents()
+        self.assertFalse(dialog.isVisible())
+        self.assertTrue(window.isVisible())
+        self.assertEqual(window.stack.currentIndex(), self.pw.MATERIALS_PAGE)
+        for index in range(5):
+            window.nav.button(index).click()
+            self.assertEqual(window.stack.currentIndex(), index)
+        self.assertIs(self._open(), dialog)
+        self.assertTrue(dialog.isVisible())
+        self.assertEqual(dialog.panel.plate_heatmap.rowCount(), 11)
+        window.close()
+        self.app.processEvents()
+        self.assertFalse(dialog.isVisible())  # the program's end closes it
+
+
 if __name__ == "__main__":
     unittest.main()

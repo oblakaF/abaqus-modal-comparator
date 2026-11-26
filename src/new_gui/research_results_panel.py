@@ -18,6 +18,10 @@ models of the plate README §24–§26 against the 11 records, read from one sep
 the corrected scan window with its conditional transfer to 261027, the declared criteria, the branch tracking and the
 limitations. The PRIORITY-1–4 plate tables, the local matrix and the inverse scenarios follow as B. Historical —
 superseded scan geometry. The model is chosen with four buttons; nothing is computed and no model is preferred.
+
+PLATE-0875-RESEARCH-ACCESS-FIX-01: ``ResearchResultsDialog`` shows the same page in a separate, labelled, read-only
+window. The program's window opens it from Help and imports this module only then. The dialog is given nothing of the
+open analysis: no file identity, no result, no registration.
 """
 
 from __future__ import annotations
@@ -27,8 +31,9 @@ from typing import Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QPushButton,
-                               QSizePolicy, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel,
+                               QPushButton, QScrollArea, QSizePolicy, QTableWidget, QTableWidgetItem, QVBoxLayout,
+                               QWidget)
 
 from new_gui import research_results_model as rm
 from new_gui.diagnostic_panel import DiagnosticTable
@@ -41,6 +46,13 @@ AMBIGUOUS_BRUSH = QColor(255, 236, 179)
 ADDED_BRUSH = QColor(197, 225, 165)  # PRIORITY-7: FE16–FE25, added by PRIORITY-6
 LIMIT_BRUSH = QColor(255, 205, 210)  # a value outside a descriptive level, a lost branch (never hidden)
 DEFAULT_RECORD_FOLDER = Path(r"D:\git\abaqus-modal-comparator-work\research\REAL_MODAL_MATCHING_202610")
+DIALOG_TITLE = "Research Results - RESEARCH ONLY (read-only)"
+DIALOG_NOTE = ("RESEARCH ONLY - READ-ONLY. Stored research records are shown as they were saved; nothing is computed, "
+               "solved, fitted or written. This window is independent of the analysis open in the program: it reads "
+               "none of its files or results and gives nothing to analysis, registration or identification, so the "
+               "link below is always NOT VERIFIED here. No value shown is a material property, a confirmed mode pair "
+               "or a verified physical registration.")
+DIALOG_CLOSE = "Close"
 
 
 def colour(value: float) -> QColor:
@@ -621,4 +633,52 @@ class ResearchResultsPanel(QWidget):
         self.scenario_body.addWidget(_label("Limits: " + view["limits"], "hint"))
 
 
-__all__ = ["MacHeatmap", "ResearchResultsPanel", "colour"]
+class ResearchResultsDialog(QDialog):
+    """The page in its own read-only window (not modal). Its content is read when the dialog is made, so only on request.
+
+    It takes no Workspace or analysis input: ``set_workspace`` is never called here, so the link banner stays NOT VERIFIED.
+    """
+
+    def __init__(self, parent: Optional[QWidget] = None, root: Path = rr.REPO,
+                 ask_file: Optional[Callable[[str], str]] = None):
+        super().__init__(parent)
+        self.setObjectName("researchResultsDialog")
+        self.setWindowTitle(DIALOG_TITLE)
+        self.setModal(False)
+        self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, True)
+        self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(8)
+        self.note = _label(DIALOG_NOTE, "warnings")
+        layout.addWidget(self.note)
+        self.panel = ResearchResultsPanel(ask_file, root)
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(0, 0, 8, 0)
+        page_layout.addWidget(self.panel)
+        self.area = QScrollArea()
+        self.area.setObjectName("researchResultsScroll")
+        self.area.setWidgetResizable(True)
+        self.area.setFrameShape(QFrame.Shape.NoFrame)
+        self.area.setWidget(page)
+        layout.addWidget(self.area, 1)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        self.close_button = QPushButton(DIALOG_CLOSE)
+        self.close_button.setObjectName("researchResultsClose")
+        self.close_button.setAutoDefault(False)
+        self.close_button.clicked.connect(self.close)
+        row.addWidget(self.close_button)
+        layout.addLayout(row)
+        self.setMinimumSize(520, 400)
+        screen = self.screen()
+        if screen is None:
+            self.resize(1180, 780)
+        else:
+            free = screen.availableGeometry()
+            self.resize(min(1240, int(free.width() * 0.9)), min(820, int(free.height() * 0.88)))
+        self.panel.load()  # a refusal is shown in the page, never replaced
+
+
+__all__ = ["MacHeatmap", "ResearchResultsDialog", "ResearchResultsPanel", "colour"]

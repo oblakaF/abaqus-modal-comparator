@@ -33,7 +33,8 @@ REUSED = ("Physical registration reused by FE geometry identity (X): SP-13 fixtu
           "mapping). archived sensitivities apply only if 11. Scaling verifies this ODB.")
 SIZES = ((900, 680), (1366, 768))
 ALLOWED = re.compile(r"Physically validated archived evidence|Single-plate model calibration|Load the specimen FE model"  # GUI-UX-R1
-                     r"|Research Tuning|" + re.escape(pw.TUNING_SUBTITLE))  # REAL-FIT.R1: the owner-specified research page
+                     r"|Research Tuning|" + re.escape(pw.TUNING_SUBTITLE)  # REAL-FIT.R1: the owner-specified research page
+                     + "|" + re.escape(pw.RESEARCH_ACTION))  # PLATE-0875-RESEARCH-ACCESS-FIX-01: the one Help command
 
 
 def shown_text(window) -> list:
@@ -100,6 +101,10 @@ class NavigationTests(_WindowCase):
         self.assertEqual([a.text() for a in window.menuBar().actions()[0].menu().actions() if a.text()],
                          ["Open Project...", "Save Project", "Save Project As...", "Close Project",
                           "Choose FE file...", "Choose experimental file...", "Exit"])
+        # PLATE-0875-RESEARCH-ACCESS-FIX-01: Help holds the one explicit route to the stored research records
+        self.assertEqual([a.text() for a in window.menuBar().actions()[1].menu().actions()],
+                         ["About", "Research Results..."])
+        self.assertIsNone(window.research_dialog)  # nothing of it exists before the command is chosen
 
     def test_the_window_is_clean_before_and_after_an_analysis(self):
         for size in SIZES:

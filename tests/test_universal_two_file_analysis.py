@@ -681,7 +681,12 @@ class PrimaryWorkflowTextTests(unittest.TestCase):
         pattern = re.compile(r"SP-?\d|M11|PLATE|plate|Plate|specimen|Specimen|known_sources|research_results")
         for name in self.FILES:
             text = (ROOT / "src" / "new_gui" / name).read_text(encoding="utf-8")
-            self.assertEqual(pattern.findall(text), [], name)
+            # PLATE-0875-RESEARCH-ACCESS-FIX-01: the program's window names the research page module once, in the
+            # import made inside the Help > Research Results command; nothing else of it is allowed
+            allowed = ["research_results"] if name == "production_window.py" else []
+            self.assertEqual(pattern.findall(text), allowed, name)
+        window = (ROOT / "src" / "new_gui" / "production_window.py").read_text(encoding="utf-8")
+        self.assertIn("            from new_gui.research_results_panel import ResearchResultsDialog\n", window)
 
     def test_no_machine_path(self):
         for name in self.FILES:
