@@ -1,12 +1,13 @@
 # PLATE-ONLY-R1 — effective properties of one CFRP plate (research, non-normative)
 
-**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24; the prospective directional stiffness test of §22.8 solved with one owner-authorised Abaqus solve and one ODB extraction, all three criteria met, 2026-11-26, see §25; the combined model with the wedge thickness of §18 and the stiffness ratio of §25, one owner-authorised Abaqus solve and one ODB extraction, record 7 explained, records 3 and 4 not, one record outside ± 5 %, 2026-11-26, see §26). Research only, non-normative.** This report changes no specification, decision,
+**Status: REVIEW_READY (2026-10-30; F1 traceability and notation, see §11; PLATE-ONLY-R2 specimen identity, archived record, FE applicability and orientation, see §12; R2-F1 package identity, the two series and the thickness, see §13; PLATE-WORKBENCH-RC1 integration, registration readiness and the prepared FE campaign, with the owner's final correction of the test conditions, see §14; the owner's statement of the material family, 2026-11-24, see §15; the owner's confirmation of the scanned face and the four remaining registration facts, 2026-11-24, see §16; the research FE / EXP MAC of 261027 and its geometry sensitivity, 2026-11-24, see §17; the FE applicability check of the existing wedge-thickness model, 2026-11-25, with one owner-authorised ODB extraction and no solve, see §18; the thickness field built from all 20 perimeter readings, 2026-11-25, with one owner-authorised Abaqus solve and one ODB extraction, see §19; the material sensitivity of the existing FE variants, 2026-11-25, see §20; the experimental quality of the 11 fitted records against the stored response data, 2026-11-25, see §21; the directional bending stiffness hypothesis against the existing FE results, with the qualification of §21, 2026-11-25, see §22; the recheck of the 261016 scan window, which finds the 215 mm width of the nominal mapping to be a unit-conversion error, 2026-11-25, see §23; the corrected scan normalisation in the program and the research MAC recomputed with the corrected positions, which supersedes the MAC results of §17–§22 for current research conclusions, 2026-11-26, see §24; the prospective directional stiffness test of §22.8 solved with one owner-authorised Abaqus solve and one ODB extraction, all three criteria met, 2026-11-26, see §25; the combined model with the wedge thickness of §18 and the stiffness ratio of §25, one owner-authorised Abaqus solve and one ODB extraction, record 7 explained, records 3 and 4 not, one record outside ± 5 %, 2026-11-26, see §26; the instrument-metadata scan normalisation made the default of new reconstructions in the service and the tool, the earlier reading kept by explicit selection only, and the corrected plate reconstruction written under its own name, 2026-11-26, see §27). Research only, non-normative.** This report changes no specification, decision,
 status, evidence, registration, criterion or catalogue entry. It releases no material constant. No LM, parameter fit
 or Auto-ID was run. Abaqus was used only under an explicit owner authorisation and only in four sections: one ODB
 extraction of an archived result (§18), and one eigenfrequency solve with one ODB extraction in each of §19, §25
 and §26. §1–§17 and
 §20–§24 ran no Abaqus; §21 reads experimental files only, §23 reads instrument records only, the others read
-existing FE results. §24 is the only section that changes program code (`src/services/psv_video_registration.py`).
+existing FE results. §24 and §27 are the only sections that change program code (`src/services/psv_video_registration.py`; in §27 also
+`tools/reconstruct_psv_registration.py`).
 
 - **Scope (owner).** The sandwich panels are set aside. One specimen is studied: `PLATE-300x300x1mm`, series
   `NEXP29/PLATE300-1MM/S261027-ROTATED`.
@@ -2976,11 +2977,13 @@ section now carries a note that points here.
 
 **Open for the owner.**
 
-1. **The governed tool.** `tools/reconstruct_psv_registration.py` still calls the earlier reading, because the
+1. **The governed tool.** (**§27:** the tool now defaults to the corrected reading and reaches the earlier one only by
+   explicit selection; the SP-02 and SP-13 records were not rebuilt.) `tools/reconstruct_psv_registration.py` still calls the earlier reading, because the
    SP-02 and SP-13 records and their reproduction tests depend on it and are outside this task. Whether the tool
    moves to the corrected reading, and whether those two records are re-examined on their own instrument files, is
    a decision about accepted evidence (§23.8, item 2).
-2. **The nominal mapping file.** `plate_reconstruction_W301xH300.json` is unchanged. This section uses the corrected
+2. **The nominal mapping file.** (**§27:** a corrected reconstruction now exists under its own name; the consumers of
+   the old file are listed in §27.4.) `plate_reconstruction_W301xH300.json` is unchanged. This section uses the corrected
    positions for research; any program function that reads that file still reads the old positions.
 3. **The 261027 window.** Its size (279 or 287 mm) and offsets stay unrecorded. This section shows that the open
    3 % does not change a conclusion; it does not close the question.
@@ -3767,6 +3770,132 @@ Changed in the repository: this report only.
 `.odb`, `.sta`, `.msg`, logs), `scripts\extract_odb.py`, `logs\`, `extraction\`, `identity.json`, `run_combined.py`,
 `results.json`, `arrays.npz`, `report.py`, `fig_four_models.png`, `fig_mac_four_states.png`,
 `fig_shapes_exp_3_4_7_8.png`.
+
+## 27. PSV-NORMALIZATION-INTEGRATION-01 — the instrument-metadata reading as the default of new reconstructions (2026-11-26)
+
+`RESEARCH_ONLY`, `PHYSICAL_REGISTRATION_NOT_VERIFIED` for every plate quantity below. A code integration task: no
+Abaqus, no modal quantity, no MAC, no parameter, no identification. No accepted registration, passport, frozen
+evidence, gate or decision was changed, and no SP-02 or SP-13 reconstruction was made. M8 GATE NOT_MET, D-077
+`NO_GLOBAL_PARAMETER_VALUE` and production Auto-ID BLOCKED are unchanged.
+
+**Short answer.** A reconstruction that names no reading now uses the instrument metadata and writes a v2 record, in
+the service and in the command-line tool. The earlier reading is reached only by naming it. A refusal stays a
+refusal: nothing falls back. The corrected plate reconstruction is written under its own name and is 287.1 × 285.3
+mm. The superseded plate record is unchanged, and six groups of consumers still carry it (§27.4).
+
+### 27.1 Callers, and what changed
+
+Every caller of the reconstruction service and tool in the repository:
+
+| Caller | Before | Now |
+|---|---|---|
+| `services.psv_video_registration.reconstruct` | `normalisation` defaulted to the earlier reading (§24.1) | defaults to `instrument-metadata`; `legacy-default-rectangle` only when passed |
+| `tools/reconstruct_psv_registration.py`, `build` | called the service without a reading | keyword-only `normalisation`, default `instrument-metadata`, passed to the service |
+| the tool's command line | no option | `--normalisation {instrument-metadata, legacy-default-rectangle}`, default `instrument-metadata`; on a refusal it exits with `REFUSED (<reading>): <reason>` and writes no file |
+| `tests/test_sp02_physical_registration.py`, `tests/test_sp13_physical_registration.py` (reproduction of the accepted records) | called `build` without a reading | pass `normalisation=normalisation_of_record(record)`: the reading is named by the schema of the stored record (v1 → legacy) and the rebuilt schema is compared |
+| `tests/test_psv_video_registration.py` | named the reading in every call | unchanged calls, plus the tests of §27.3 |
+| `research/m11_r65/run_m11_r65.py` | uses only the parser functions and `unv_scan_geometry`; never `reconstruct` | not affected, not changed |
+
+- **New in the tool:** `normalisation_of_record(record)`. It returns the reading that wrote a stored record from its
+  schema and refuses an unknown schema. A reproduction therefore states its reading; it is never implied.
+- **No fallback.** Neither file has a path from a refusal to the other reading. A test parses both files and fails
+  if an exception handler refers to the legacy reading or calls a reconstruction (§27.3).
+- **Records unchanged.** The v1 record of the legacy reading and the v2 record of the instrument reading have the
+  content they had at `3a4af8b`: byte-identical on three synthetic files for both readings, and on the real 261016
+  file for the instrument reading (`provenance.json`).
+- `tools/build_sp13_physical_registration.py`, `tools/build_physical_registration.py` and every `src` service read
+  stored records; none calls the reconstruction.
+
+### 27.2 The corrected plate reconstruction
+
+Written to `D:\git\abaqus-modal-comparator-work\research\PSV_NORMALIZATION_INTEGRATION_01` (outside git). Source:
+session 261016, `.svd` `0a770b1b…`, PSV export `6d66eafe…`, plan 301 × 300 mm.
+
+| File | What it is | Window, mm | Gaps left / right / bottom / top, mm |
+|---|---|---|---|
+| `plate_reconstruction_W301xH300_CORRECTED_instrument_metadata.json` (`8047872a…`) | **the corrected reconstruction:** instrument-metadata pixels with the recorded M11 plate corners | **287.1 × 285.3** | 7.1 / 6.8 / 7.0 / 7.7 |
+| `plate_261016_reconstruction_v2_tool_default.json` (`15c211da…`) | the command-line tool with its new default, unattended; a v2 record | 287.1 × 285.7 | 7.2 / 6.7 / 6.7 / 7.6 |
+| `runs\m11_carbon_plate\plate_reconstruction_W301xH300.json` (`09be8b88…`) | the superseded M11 record, **unchanged** | 215.4 × 285.2 | 56.4 / 29.2 / 7.0 / 7.8 |
+
+- **Verified.** The corrected reconstruction equals the primary geometry of §24 for all 289 points (difference
+  0.0 mm). Against the superseded record it differs by up to 49.3 mm (rms 25.7 mm); the superseded width is 0.750 of
+  the corrected one.
+- **Frame resolved from the file.** Scan points in the default point-list frame, scan object in the full-frame
+  rectangle; 1440.0 px per unit derived from the stored frame. Hull against scan object: 0.0004 px for this pair,
+  146–341 px for the three others.
+- **Two files, because the tool cannot yet write the first one.** The tool fits the plate edges itself. On this
+  frame its bottom edge is the structure that M11 deviation 3 replaced (§24.2), which moves points by up to 4.3 mm
+  and gives 285.7 mm. The pixel normalisation of the two files is the same. The corrected reconstruction takes the
+  recorded M11 corners; they do not depend on the normalisation.
+- **Provenance of the corrected file:** its own schema name (`research/plate-0875/corrected-scan-reconstruction/v1`),
+  the hashes of the `.svd`, the export, the five PSV streams and the M11 record that supplies the corners, the
+  resolved normalisation with all four trials, the commit and module hash that produced it, and the record it
+  supersedes for research. It is not a tool record, not a `FrozenRegistration` and not an accepted registration.
+- **The earlier reading on this file, named explicitly:** the tool refuses (`panel edge 'top': too few edge samples`)
+  and writes nothing. The default run did not use it.
+- **No silent replacement.** Nothing reads the corrected file yet. Every consumer of §27.4 still reads what it read
+  before.
+
+### 27.3 Tests
+
+`tests.test_psv_video_registration`: 34 tests (22 before).
+
+| Required | Tests |
+|---|---|
+| Corrected default | the service and the tool default to `instrument-metadata`; a call without a reading gives the v2 record and the true positions of a synthetic grid to 0.6 mm, identical to the explicit call |
+| Explicit legacy reproduction | the explicit legacy call gives the v1 record form; the tool with `--normalisation legacy-default-rectangle` writes the same points, normalisation and stream hashes as the service; the accepted SP-02 and SP-13 records name the legacy reading; the two reproduction tests select the reading from the record |
+| Refusal of ambiguous metadata | two files that the legacy reading accepts (an undecidable frame, a missing scan object): the default refuses both; plus the nine refusal tests of §24 |
+| No fallback | no exception handler of the service or the tool refers to the legacy reading or calls a reconstruction |
+| CLI integration | the tool on a synthetic data store: default run (v2), named default, explicit legacy (v1), refusal (exit, message, no file), unknown reading rejected |
+| Synthetic geometry regression | the 0.750 horizontal compression of the legacy reading and its recovery by the instrument reading (unchanged from §24) |
+| Real 261016 | frame resolved from the file; 287.1 × 285.3 mm with the recorded corners |
+
+### 27.4 Consumers of the superseded plate geometry
+
+None of these was changed; all are outside the allowed files of this task. Each needs its own integration task and,
+where results are published, an owner decision.
+
+| Consumer | What it carries | Kind |
+|---|---|---|
+| `research/m11_r65/run_m11_r65.py` with `research/m11_r65/expected_inputs.json` | reads `plate_reconstruction_W301xH300.json` as `scan_geometry_nominal`, pinned by hash `09be8b88…`; its 29 tests pin the M11 R6.5 research MAC | code, pinned |
+| `research/real_modal_matching/run_real_matching.py` | reads the same file for the plate research MAC (`plate_research_mac`) | code |
+| `docs/research/real_modal_matching_202610/` (`PLATE_MODAL_MATCHING.csv`, `RESULTS.md`), read by `services/research_results_reader.py` and shown by `new_gui/research_results_model.py` / `research_results_panel.py` | the plate research MAC computed with the superseded positions, read for the research results panel of the GUI | published results, GUI |
+| `services/plate_registration_readiness.py` (lines 524, 556–558), `services/plate_physical_review.py`, `services/plate_study.py` | state the 261016 window as "≈ 215.4 × 285.2 mm" and refer to the diagnostic reconstruction W301xH300 | program text, tested |
+| `docs/reconciliation/M11_SINGLE_CFRP_PLATE.md` / `.json`, `docs/research/plate_only/PLATE_WORKBENCH_RC1.md`, `docs/research/plate_physical_readiness_p9/`, `docs/research/plate_fe_response_p10/`, `docs/research/plate_s4_central/` | cite the W301xH300 reconstruction or the 215.4 mm window | documents, some governed |
+| the research work directories of §17–§22 (outside git) | read the superseded record through `P.PATHS["scan_geometry_nominal"]`; already marked superseded in §24 | external scripts |
+
+**Other remaining items.**
+
+- **SP-02 and SP-13.** Their accepted records are v1 records and were not rebuilt. On this machine the data stores
+  are not configured, so the two reproduction tests were skipped: the explicit legacy reading is verified on
+  synthetic files and against the module at `3a4af8b`, not on the SP-02 and SP-13 files. Whether the instrument
+  reading accepts those files, and whether their v1 positions are affected by the defect, is still not known
+  (§24.9, item 1). That is a decision about accepted evidence.
+- **SP-10.** `docs/reconciliation/M10_SP10_REGISTRATION_PREP.md` records that its prepared reconstruction used the
+  same method as SP-02 and SP-13, the earlier reading. It was not examined here.
+- **The plate corners.** The tool has no way to take recorded corners, so it cannot reproduce 285.3 mm on this frame.
+- **The external script `PLATE_0875_SCAN_NORMALIZATION_FIX_01\run_fix.py`** calls the service once without a reading
+  to record the legacy refusal on the plate file. With the new default that call returns the v2 record. Its stored
+  results are unchanged; a re-run would differ in that one diagnostic field.
+- **The 261027 window** has no instrument record (§24.9, item 3).
+
+### 27.5 Verification and files
+
+| Check | Result |
+|---|---|
+| Git | origin = HEAD = `3a4af8b6…` and a clean tracked tree before the edit |
+| Inputs | `.svd`, PSV export, M11 record and the arrays of §24 equal their recorded hashes; unchanged in size, mtime and SHA-256 after the run |
+| Records unchanged | v1 and v2 records byte-identical to those of the module at `3a4af8b` (three synthetic files, both readings; the real 261016 file, instrument reading) |
+| Governed files | `docs/auto_id`, `docs/registrations`, `docs/baseline` have no difference to HEAD |
+| Tests | `tests.test_psv_video_registration`: 34 OK. `tests.test_sp02_physical_registration`: 18 OK (6 skipped). `tests.test_sp13_physical_registration`: 17 OK (4 skipped). `tests.test_physical_registration`: 24 OK. `tests.test_plate_physical_review`: 36 OK. `tests.test_plate_registration_readiness`: 18 OK. `tests.test_plate_study`: 30 OK. `tests.test_plate_rc1_owner_clarification`: 12 OK. `research/m11_r65`: 29 OK. Run one at a time |
+| Skipped | the 6 + 4 store tests of SP-02 and SP-13 (data stores `snadwich` and `carbon-project-archive` not configured), among them the two reproductions of the accepted records |
+
+Changed in the repository: `src/services/psv_video_registration.py`, `tools/reconstruct_psv_registration.py`,
+`tests/test_psv_video_registration.py`, `tests/test_sp02_physical_registration.py`,
+`tests/test_sp13_physical_registration.py` and this report.
+
+`D:\git\abaqus-modal-comparator-work\research\PSV_NORMALIZATION_INTEGRATION_01` (outside git): `generate.py`,
+`provenance.json`, the two reconstruction files of §27.2, `base_module\`, `tests.log`.
 
 ## Not changed
 

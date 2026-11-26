@@ -9,6 +9,7 @@ metadata are refused. No modal quantity appears anywhere.
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 import io
 import json
@@ -361,11 +362,157 @@ class ReconstructionTests(unittest.TestCase):
             self.assertEqual(self.legacy.record[key], self.corrected.record[key])
 
 
+def tool():
+    sys.path.insert(0, str(ROOT / "tools"))
+    import reconstruct_psv_registration
+
+    return reconstruct_psv_registration
+
+
+class DefaultNormalisationTests(unittest.TestCase):
+    """PSV-NORMALIZATION-INTEGRATION-01: a new reconstruction reads the instrument metadata; legacy is explicit only."""
+
+    def test_service_and_tool_default_to_the_instrument_reading(self):
+        self.assertEqual(inspect.signature(V.reconstruct).parameters["normalisation"].default, V.NORMALISATION_INSTRUMENT)
+        build = inspect.signature(tool().build).parameters["normalisation"]
+        self.assertEqual(build.default, V.NORMALISATION_INSTRUMENT)
+        self.assertIs(build.kind, inspect.Parameter.KEYWORD_ONLY)
+
+    def test_reconstruction_without_a_selection_is_the_corrected_one(self):
+        case = SyntheticCase()
+        result = V.reconstruct(case.svd(), case.unv_xy_m, case.ids, *case.panel_mm, sources={})
+        self.assertEqual(result.record["schema"], V.SCHEMA_INSTRUMENT)
+        self.assertEqual(result.record["pixel_normalisation"]["mode"], V.NORMALISATION_INSTRUMENT)
+        self.assertLess(np.linalg.norm(result.panel_points_mm - case.true_mm, axis=1).max(), 0.6)
+        explicit = case.reconstruct(V.NORMALISATION_INSTRUMENT)
+        self.assertEqual(json.dumps(result.record, sort_keys=True), json.dumps(explicit.record, sort_keys=True))
+
+    def test_default_refuses_and_does_not_fall_back_to_the_legacy_reading(self):
+        """Files the legacy reading would accept: the default must refuse them, not answer with a v1 record."""
+        undecidable = SyntheticCase(size=(1440, 1080), full=POINTS_4_3, points_frame=POINTS_4_3, list_frame=FULL_16_9,
+                                    plate=(360, 1080, 60, 1020))
+        no_object = SyntheticCase()
+        cases = {"undecidable": (undecidable, {}), "no scan object": (no_object, {"without": ("Info/APS_Mixed/MeshObject1/ScanObjects",)})}
+        for name, (case, kwargs) in cases.items():
+            with self.subTest(case=name):
+                legacy = case.reconstruct(V.NORMALISATION_LEGACY, **kwargs)  # the legacy reading does answer
+                self.assertEqual(legacy.record["schema"], V.SCHEMA)
+                with self.assertRaises(PSVRegistrationError):
+                    V.reconstruct(case.svd(**kwargs), case.unv_xy_m, case.ids, *case.panel_mm, sources={})
+
+    def test_no_reading_is_chosen_by_catching_a_refusal(self):
+        """Neither the service nor the tool contains a path from a refusal to the other reading."""
+        import ast
+
+        for path in (ROOT / "src" / "services" / "psv_video_registration.py", ROOT / "tools" / "reconstruct_psv_registration.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ExceptHandler):
+                    names = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)} | {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)}
+                    with self.subTest(path=path.name, line=node.lineno):
+                        self.assertFalse(names & {"NORMALISATION_LEGACY", "reconstruct", "build", "default_rectangle"})
+
+    def test_schema_names_the_reading_of_a_stored_record(self):
+        t = tool()
+        self.assertEqual(t.normalisation_of_record({"schema": V.SCHEMA}), V.NORMALISATION_LEGACY)
+        self.assertEqual(t.normalisation_of_record({"schema": V.SCHEMA_INSTRUMENT}), V.NORMALISATION_INSTRUMENT)
+        for record in ({}, {"schema": "auto-id/psv-physical-registration-reconstruction/v3"}):
+            with self.assertRaises(PSVRegistrationError):
+                t.normalisation_of_record(record)
+
+
+def write_unv(path: Path, ids, xy_m) -> None:
+    lines = ["    -1", "  2411"]
+    for i, (x, y) in zip(ids, xy_m):
+        lines += ["%10d%10d%10d%10d" % (i, 1, 1, 11), "%25.16E%25.16E%25.16E" % (x, y, 0.0)]
+    path.write_text("\n".join(lines + ["    -1", ""]), encoding="latin-1")
+
+
+class ToolIntegrationTests(unittest.TestCase):
+    """The command-line tool on a synthetic data store (no real measurement is read)."""
+
+    STORE = "psv-synthetic-test"
+
+    def setUp(self):
+        import os
+        import tempfile
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        key = "AUTO_ID_FIXTURE_ROOT_" + self.STORE.upper().replace("-", "_")
+        previous = os.environ.get(key)
+        os.environ[key] = str(self.root)
+        self.addCleanup(lambda: os.environ.pop(key, None) if previous is None else os.environ.__setitem__(key, previous))
+        self.case = SyntheticCase()
+        (self.root / "good.svd").write_bytes(self.case.svd())
+        (self.root / "no_object.svd").write_bytes(self.case.svd(without=("Info/APS_Mixed/MeshObject1/ScanObjects",)))
+        write_unv(self.root / "scan.unv", self.case.ids, self.case.unv_xy_m)
+
+    def run_tool(self, svd, out, *extra):
+        argv = ["--store", self.STORE, "--svd", svd, "--unv", "scan.unv", "--width-mm", str(self.case.panel_mm[0]),
+                "--height-mm", str(self.case.panel_mm[1]), "--dimension-source", "synthetic", "--out", str(self.root / out), *extra]
+        with contextlib.redirect_stdout(io.StringIO()):
+            tool().main(argv)
+        return json.loads((self.root / out).read_text(encoding="utf-8"))
+
+    def test_unv_written_for_the_test_is_read_back(self):
+        ids, xy = tool().unv_scan_geometry(self.root / "scan.unv")
+        self.assertEqual(ids, self.case.ids)
+        self.assertLess(np.abs(xy - self.case.unv_xy_m).max(), 1e-15)
+
+    def test_default_run_writes_the_corrected_v2_record(self):
+        record = self.run_tool("good.svd", "default.json")
+        self.assertEqual(record["schema"], V.SCHEMA_INSTRUMENT)
+        self.assertEqual(record["pixel_normalisation"]["mode"], V.NORMALISATION_INSTRUMENT)
+        self.assertEqual(record["unv_node_ids"], self.case.ids)
+        self.assertEqual(record["sources"]["svd"]["relative_path"], "good.svd")
+        self.assertEqual(len(record["sources"]["svd"]["sha256"]), 64)
+        self.assertLess(np.linalg.norm(np.array(record["scan_points_panel_mm"]) - self.case.true_mm, axis=1).max(), 0.6)
+        named = self.run_tool("good.svd", "named.json", "--normalisation", V.NORMALISATION_INSTRUMENT)
+        self.assertEqual(named, record)
+
+    def test_explicit_legacy_run_writes_the_v1_record(self):
+        record = self.run_tool("good.svd", "legacy.json", "--normalisation", V.NORMALISATION_LEGACY)
+        self.assertEqual(record["schema"], V.SCHEMA)
+        self.assertNotIn("mode", record["pixel_normalisation"])
+        direct = self.case.reconstruct(V.NORMALISATION_LEGACY).record
+        self.assertEqual(record["scan_points_panel_mm"], direct["scan_points_panel_mm"])
+        self.assertEqual(record["pixel_normalisation"], direct["pixel_normalisation"])
+        self.assertEqual(record["stream_sha256"], direct["stream_sha256"])
+        self.assertEqual(tool().normalisation_of_record(record), V.NORMALISATION_LEGACY)
+
+    def test_refusal_writes_nothing_and_tries_no_other_reading(self):
+        with self.assertRaises(SystemExit) as caught:
+            self.run_tool("no_object.svd", "refused.json")
+        self.assertIn("REFUSED (%s)" % V.NORMALISATION_INSTRUMENT, str(caught.exception))
+        self.assertFalse((self.root / "refused.json").exists())
+        legacy = self.run_tool("no_object.svd", "refused_legacy.json", "--normalisation", V.NORMALISATION_LEGACY)
+        self.assertEqual(legacy["schema"], V.SCHEMA)  # the file is readable by the legacy reading: the default did not use it
+
+    def test_unknown_reading_is_rejected_by_the_command_line(self):
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            self.run_tool("good.svd", "x.json", "--normalisation", "auto")
+        self.assertFalse((self.root / "x.json").exists())
+
+
 class HistoricalReproducibilityTests(unittest.TestCase):
-    def test_default_reading_and_v1_schema_are_unchanged(self):
+    def test_v1_schema_and_legacy_reading_stay_available_by_name(self):
         self.assertEqual(V.SCHEMA, "auto-id/psv-physical-registration-reconstruction/v1")
-        self.assertEqual(inspect.signature(V.reconstruct).parameters["normalisation"].default, V.NORMALISATION_LEGACY)
-        self.assertNotEqual(V.SCHEMA_INSTRUMENT, V.SCHEMA)
+        self.assertEqual(V.SCHEMA_INSTRUMENT, "auto-id/psv-physical-registration-reconstruction/v2")
+        self.assertEqual(V.NORMALISATION_LEGACY, "legacy-default-rectangle")
+        self.assertEqual(V.NORMALISATION_BY_SCHEMA, {V.SCHEMA: V.NORMALISATION_LEGACY, V.SCHEMA_INSTRUMENT: V.NORMALISATION_INSTRUMENT})
+
+    def test_stored_records_name_the_legacy_reading(self):
+        for name in ("SP13_physical_registration_reconstruction.json", "SP02_physical_registration_reconstruction.json"):
+            record = json.loads((EVIDENCE / name).read_text(encoding="utf-8"))
+            with self.subTest(name=name):
+                self.assertEqual(tool().normalisation_of_record(record), V.NORMALISATION_LEGACY)
+
+    def test_store_reproduction_tests_select_the_reading_from_the_record(self):
+        for name in ("test_sp02_physical_registration.py", "test_sp13_physical_registration.py"):
+            with self.subTest(name=name):
+                self.assertIn("normalisation=normalisation_of_record(record)", (ROOT / "tests" / name).read_text(encoding="utf-8"))
 
     def test_stored_records_are_v1_records(self):
         for name in ("SP13_physical_registration_reconstruction.json", "SP02_physical_registration_reconstruction.json"):

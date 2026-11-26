@@ -9,6 +9,13 @@ Example (SP-13, M6 registration gate):
         --out docs/auto_id/registration_evidence/SP13_physical_registration_reconstruction.json
 
 No modal data and no MAC are read. Store roots come from AUTO_ID_FIXTURE_ROOT_<STORE> variables.
+
+Pixel normalisation. A new reconstruction reads the frame of the scan points from the stored instrument
+metadata (``--normalisation instrument-metadata``, the default) and writes a v2 record. If the metadata do
+not decide, the tool refuses and writes nothing; it never falls back to the earlier reading. The earlier
+reading (``--normalisation legacy-default-rectangle``) exists only to reproduce a stored v1 record and
+must be named explicitly. The example above is a v1 record: to reproduce it, add
+``--normalisation legacy-default-rectangle``.
 """
 
 from __future__ import annotations
@@ -25,7 +32,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from domain.experiment_fixture import fixture_roots_from_environment  # noqa: E402
-from services.psv_video_registration import reconstruct  # noqa: E402
+from services.psv_video_registration import (  # noqa: E402
+    NORMALISATION_BY_SCHEMA,
+    NORMALISATION_INSTRUMENT,
+    NORMALISATION_LEGACY,
+    PSVRegistrationError,
+    reconstruct,
+)
 
 
 def unv_scan_geometry(path: Path) -> tuple[list[int], np.ndarray]:
@@ -50,8 +63,22 @@ def file_identity(store: str, relative: str, path: Path) -> dict:
 NO_RESOLUTION = "NOT_AVAILABLE (no instrument resolution recorded)"
 
 
+def normalisation_of_record(record: dict) -> str:
+    """The pixel normalisation that wrote a stored reconstruction record, named by its schema (for reproduction)."""
+    schema = record.get("schema")
+    if schema not in NORMALISATION_BY_SCHEMA:
+        raise PSVRegistrationError(f"reconstruction record of unknown schema {schema!r}: its pixel normalisation "
+                                   "cannot be named")
+    return NORMALISATION_BY_SCHEMA[schema]
+
+
 def build(store: str, svd: str, unv: str, width_mm: float, height_mm: float, dimension_source: str,
-          dimension_uncertainty: str = NO_RESOLUTION) -> dict:
+          dimension_uncertainty: str = NO_RESOLUTION, *, normalisation: str = NORMALISATION_INSTRUMENT) -> dict:
+    """Reconstruction record of one stored measurement.
+
+    The default normalisation is the instrument-metadata reading. A refusal is raised to the caller; nothing
+    here retries with another reading. ``NORMALISATION_LEGACY`` reproduces a v1 record and is never implied.
+    """
     roots = fixture_roots_from_environment()
     if store not in roots:
         raise SystemExit(f"data store {store!r} is not configured")
@@ -60,13 +87,14 @@ def build(store: str, svd: str, unv: str, width_mm: float, height_mm: float, dim
     sources = {"svd": file_identity(store, svd, svd_path), "unv_geometry": file_identity(store, unv, unv_path),
                "panel_dimensions": {"width_mm": width_mm, "height_mm": height_mm, "source": dimension_source,
                                     "uncertainty": dimension_uncertainty}}
-    result = reconstruct(svd_path.read_bytes(), xy, ids, width_mm, height_mm, sources=sources)
+    result = reconstruct(svd_path.read_bytes(), xy, ids, width_mm, height_mm, sources=sources,
+                         normalisation=normalisation)
     record = dict(result.record)
     record["unv_node_ids"] = ids
     return record
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--store", required=True)
     parser.add_argument("--svd", required=True)
@@ -76,10 +104,17 @@ def main() -> None:
     parser.add_argument("--dimension-source", required=True)
     parser.add_argument("--dimension-uncertainty", default=NO_RESOLUTION,
                         help="recorded readout resolution of the dimension measurement (never a calibration claim)")
+    parser.add_argument("--normalisation", choices=(NORMALISATION_INSTRUMENT, NORMALISATION_LEGACY),
+                        default=NORMALISATION_INSTRUMENT,
+                        help="pixel normalisation; the default reads the stored instrument metadata and refuses "
+                             "when they do not decide. The legacy reading only reproduces a stored v1 record")
     parser.add_argument("--out", type=Path, required=True)
-    args = parser.parse_args()
-    record = build(args.store, args.svd, args.unv, args.width_mm, args.height_mm, args.dimension_source,
-                   args.dimension_uncertainty)
+    args = parser.parse_args(argv)
+    try:
+        record = build(args.store, args.svd, args.unv, args.width_mm, args.height_mm, args.dimension_source,
+                       args.dimension_uncertainty, normalisation=args.normalisation)
+    except PSVRegistrationError as exc:  # a refusal is the result: no record, no other reading is tried
+        raise SystemExit(f"REFUSED ({args.normalisation}): {exc}") from exc
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {args.out}")

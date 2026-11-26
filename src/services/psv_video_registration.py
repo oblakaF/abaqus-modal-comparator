@@ -16,12 +16,17 @@ The panel edges are fitted in the frame. The physical scale comes from the measu
 dimensions (spec, ruler and calipers; no instrument uncertainty recorded). **No modal data and no
 MAC are used anywhere in this module**: the registration is fixed before any pairing is evaluated.
 
-Pixel normalisation (PLATE-0875-SCAN-NORMALIZATION-FIX-01). A PSV file stores video coordinates in more
-than one unit frame. ``NORMALISATION_LEGACY`` reads the scan points in the default full-frame rectangle;
-that is the reading of the v1 records and it is kept unchanged so that they stay reproducible. It
-compresses the grid horizontally when the file stores the points in another frame.
-``NORMALISATION_INSTRUMENT`` takes the frame of the scan points from the stored metadata, verifies it
-against the stored scan object and refuses when the metadata are missing, unsupported or ambiguous.
+Pixel normalisation (PLATE-0875-SCAN-NORMALIZATION-FIX-01, PSV-NORMALIZATION-INTEGRATION-01). A PSV file
+stores video coordinates in more than one unit frame.
+
+- ``NORMALISATION_INSTRUMENT`` is the default of every new reconstruction. It takes the frame of the scan
+  points from the stored metadata, verifies it against the stored scan object and refuses when the metadata
+  are missing, unsupported or ambiguous. It writes a v2 record.
+- ``NORMALISATION_LEGACY`` reads the scan points in the default full-frame rectangle. That is the reading of
+  the v1 records. It compresses the grid horizontally when the file stores the points in another frame, so
+  it is kept only for the reproduction of those records and must be selected explicitly.
+
+There is no fallback from one reading to the other: a refusal of the instrument reading is the result.
 """
 
 from __future__ import annotations
@@ -37,8 +42,9 @@ import numpy as np
 
 SCHEMA = "auto-id/psv-physical-registration-reconstruction/v1"
 SCHEMA_INSTRUMENT = "auto-id/psv-physical-registration-reconstruction/v2"
-NORMALISATION_LEGACY = "legacy-default-rectangle"  # v1 records; kept for their reproduction only
-NORMALISATION_INSTRUMENT = "instrument-metadata"
+NORMALISATION_LEGACY = "legacy-default-rectangle"  # v1 records; explicit selection only, for their reproduction
+NORMALISATION_INSTRUMENT = "instrument-metadata"  # the default of new reconstructions; v2 records
+NORMALISATION_BY_SCHEMA = {SCHEMA: NORMALISATION_LEGACY, SCHEMA_INSTRUMENT: NORMALISATION_INSTRUMENT}
 _END, _FREE = 0xFFFFFFFE, 0xFFFFFFFF
 
 # Edge-fitting method constants (image analysis, not physical thresholds; recorded with every result).
@@ -427,16 +433,18 @@ class Reconstruction:
 
 def reconstruct(svd_bytes: bytes, unv_xy_m: np.ndarray, unv_node_ids: Sequence[int], panel_width_mm: float,
                 panel_height_mm: float, *, sources: Mapping[str, object],
-                normalisation: str = NORMALISATION_LEGACY) -> Reconstruction:
+                normalisation: str = NORMALISATION_INSTRUMENT) -> Reconstruction:
     """Reconstruct the physical scan-point positions on the panel from the stored PSV frame.
 
     Frame convention: origin at the panel's bottom-left corner as seen by the scanner (the measured,
     labelled face), +x to the right in the camera image, +y towards the labelled top edge.
 
-    ``normalisation`` selects how the stored video coordinates become pixels. The default is the v1 reading,
-    kept so that the v1 records are reproduced unchanged; it is wrong for a file that stores the scan points
-    in another frame than the default rectangle. ``NORMALISATION_INSTRUMENT`` resolves the frame from the
-    stored metadata (:func:`resolve_pixel_normalisation`) and writes a v2 record.
+    ``normalisation`` selects how the stored video coordinates become pixels. The default,
+    ``NORMALISATION_INSTRUMENT``, resolves the frame from the stored metadata
+    (:func:`resolve_pixel_normalisation`), writes a v2 record and raises :class:`PSVRegistrationError` when the
+    metadata do not decide; it never falls back to the v1 reading. ``NORMALISATION_LEGACY`` is the v1 reading
+    and is used only when it is passed explicitly, to reproduce a v1 record; it is wrong for a file that stores
+    the scan points in another frame than the default rectangle.
     """
     if normalisation not in (NORMALISATION_LEGACY, NORMALISATION_INSTRUMENT):
         raise PSVRegistrationError(f"unknown pixel normalisation {normalisation!r}")

@@ -187,13 +187,14 @@ class StoreReproductionTests(unittest.TestCase):
             self.skipTest(f"data stores {missing} not configured")
 
     def test_reconstruction_is_reproduced_from_the_pinned_sources(self):
-        from reconstruct_psv_registration import build
+        from reconstruct_psv_registration import build, normalisation_of_record
 
         record = json.loads(RECORD.read_text(encoding="utf-8"))
         dims = record["sources"]["panel_dimensions"]
         rebuilt = build("snadwich", record["sources"]["svd"]["relative_path"],
                         record["sources"]["unv_geometry"]["relative_path"], dims["width_mm"], dims["height_mm"],
-                        dims["source"], dims["uncertainty"])
+                        dims["source"], dims["uncertainty"], normalisation=normalisation_of_record(record))
+        self.assertEqual(rebuilt["schema"], record["schema"])
         self.assertEqual(rebuilt["sources"], record["sources"])
         self.assertEqual(rebuilt["stream_sha256"], record["stream_sha256"])
         self.assertTrue(np.allclose(rebuilt["scan_points_panel_mm"], record["scan_points_panel_mm"], atol=1e-6))
