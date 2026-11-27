@@ -395,6 +395,91 @@ class PortableRc6PackagingTests(unittest.TestCase):
                          Path("X:/portable") / "docs/research/plate_only/plate_comparison_261027.json")
         self.assertEqual(rr.REPO, Path(rr.__file__).resolve().parents[2])
 
+    # ---- WINDOWS-PREVIEW-01-SOLID-WORKER-FIX
+    def _launcher(self):
+        spec = importlib.util.spec_from_file_location("launch_new_gui_rc6", PACKAGING / "launch_new_gui.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # __name__ is not "__main__": nothing starts
+        return module
+
+    def test_the_entry_script_asks_the_worker_question_before_any_interface_module(self):
+        import subprocess
+
+        from services import solid_forward_runner as sfr
+
+        text = (PACKAGING / "launch_new_gui.py").read_text(encoding="utf-8")
+        self.assertLess(text.index("frozen_worker_dispatch(sys.argv[1:])"), text.index("from new_gui.__main__ import"))
+        self.assertNotIn("PySide6", text)
+        launcher = self._launcher()
+        interface = mock.Mock(return_value=0)
+        with mock.patch("new_gui.__main__.main", interface):
+            for arguments, code in ((["-m", "services.solid_forward_runner", "--child"], sfr.EXIT_MALFORMED_INVOCATION),
+                                    ([sfr.WORKER_OPTION, "extra"], sfr.EXIT_MALFORMED_INVOCATION)):
+                with mock.patch.object(sys, "argv", ["AbaqusModalComparator.exe", *arguments]):
+                    self.assertEqual(launcher.main(), code)
+            with mock.patch.object(sys, "argv", ["AbaqusModalComparator.exe", sfr.WORKER_OPTION]), \
+                    mock.patch.object(sfr, "_inherited_pipes", return_value=(mock.Mock(), mock.Mock())), \
+                    mock.patch.object(sfr, "_child_main", return_value=3) as worker:
+                self.assertEqual(launcher.main(), 3)  # the worker's own exit code
+            worker.assert_called_once()
+            interface.assert_not_called()  # a worker invocation, well formed or not, never opens the interface
+            for arguments in ([], ["--research"]):
+                with mock.patch.object(sys, "argv", ["AbaqusModalComparator.exe", *arguments]):
+                    self.assertEqual(launcher.main(), 0)
+            self.assertEqual(interface.call_count, 2)  # the normal start is as before
+        # in a fresh process: a refused worker invocation ends without importing the interface or Qt at all
+        probe = ("import importlib.util, sys\n"
+                 f"sys.path.insert(0, {str(ROOT / 'src')!r})\n"
+                 f"spec = importlib.util.spec_from_file_location('launcher', {str(PACKAGING / 'launch_new_gui.py')!r})\n"
+                 "module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)\n"
+                 "sys.argv = ['AbaqusModalComparator.exe', '-m', 'services.solid_forward_runner', '--child']\n"
+                 "code = module.main()\n"
+                 "loaded = [m for m in sys.modules if m.split('.')[0] in ('PySide6', 'shiboken6', 'new_gui', 'matplotlib')]\n"
+                 "print(code, loaded)\n")
+        done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, timeout=120)
+        self.assertEqual(done.stdout.strip(), f"{sfr.EXIT_MALFORMED_INVOCATION} []", done.stderr)
+
+    def test_the_packaged_program_holds_the_solid_worker_and_the_build_starts_it(self):
+        from services import solid_forward_runner as sfr
+
+        spec = (PACKAGING / "AbaqusModalComparator_RC6.spec").read_text(encoding="utf-8")
+        self.assertIn("*_build.SOLID_WORKER_MODULES]", spec)
+        self.assertIn("console=False", spec)  # still a windowed program: the worker opens its pipes itself
+        self.assertIn("services.solid_forward_runner", self.build.SOLID_WORKER_MODULES)
+        for module in self.build.SOLID_WORKER_MODULES:
+            self.assertTrue((ROOT / "src").joinpath(*module.split(".")).with_suffix(".py").is_file(), module)
+        source = (PACKAGING / "build_portable.py").read_text(encoding="utf-8")
+        self.assertLess(source.index('research["solid_worker"] = check_solid_worker(folder)'),
+                        source.index("write_package_list(folder)\n    verified"))  # before the package is listed
+        with tempfile.TemporaryDirectory(prefix="RC6 worker ") as folder:
+            folder = Path(folder)
+            stand_in = folder / "stand_in.py"
+            body = ("import sys, time\n"
+                    f"sys.path.insert(0, {str(ROOT / 'src')!r})\n"
+                    "sys.stdin = sys.stdout = sys.stderr = None\n"
+                    "from services.solid_forward_runner import frozen_worker_dispatch\n"
+                    "code = frozen_worker_dispatch(sys.argv[1:])\n"
+                    "{window}"
+                    "raise SystemExit(code)\n")
+            # a program that ignores the worker arguments and opens its window (the defect): the build stops
+            stand_in.write_text(body.format(window="code = None\ntime.sleep(60)\n"), encoding="utf-8")
+            with mock.patch.object(self.build, "SOLID_WORKER_SECONDS", 3.0), self.assertRaises(SystemExit) as refused:
+                self.build.check_solid_worker(folder, [sys.executable, str(stand_in)])
+            self.assertIn("must never open the interface", str(refused.exception))
+            # a program that answers a refused invocation with another exit code: the build stops
+            stand_in.write_text(body.format(window="code = 0\n"), encoding="utf-8")
+            with self.assertRaises(SystemExit) as refused:
+                self.build.check_solid_worker(folder, [sys.executable, str(stand_in)])
+            self.assertIn("source command", str(refused.exception))
+            if sys.platform == "win32":  # the inherited pipes are Win32; the Windows build is where the check runs
+                stand_in.write_text(body.format(window=""), encoding="utf-8")
+                checked = self.build.check_solid_worker(folder, [sys.executable, str(stand_in)])
+                self.assertEqual((checked["worker_argument"], checked["calculations"], checked["interface_opened"]),
+                                 (sfr.WORKER_OPTION, 0, False))
+                self.assertEqual((checked["source_command_exit_code"], checked["no_pipes_exit_code"]),
+                                 (sfr.EXIT_MALFORMED_INVOCATION, sfr.EXIT_NO_PIPES))
+                self.assertEqual(sorted(p.name for p in folder.iterdir()), ["stand_in.py"])  # nothing was written
+
     def test_package_list_zip_and_forbidden_files(self):
         with tempfile.TemporaryDirectory(prefix="RC6 package ") as folder:
             root = Path(folder) / "AbaqusModalComparator_RC6"

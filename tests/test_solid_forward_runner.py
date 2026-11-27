@@ -12,8 +12,10 @@ runs everywhere.
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import textwrap
@@ -449,6 +451,206 @@ class WhatIfTests(RunnerCase):
             self.assertEqual(outcome.points[0]["status"], sfr.POINT_SOLVED)
             self.assertEqual(outcome.points[2]["status"], sfr.POINT_NOT_RUN)
         self.assertNothingLeft(outcome)
+
+
+# WINDOWS-PREVIEW-01-SOLID-WORKER-FIX: what the packaged program's entry script does, with a Python process standing in
+# for the packaged program: the standard streams of the interpreter are taken away (a windowed program must not rely on
+# them), the worker question is asked first, and a start that is no worker invocation "opens the interface" (it waits).
+STAND_IN = textwrap.dedent('''
+    import sys, time
+    sys.path.insert(0, {src!r})
+    sys.stdin = sys.stdout = sys.stderr = None
+    from services.solid_forward_runner import frozen_worker_dispatch
+    code = frozen_worker_dispatch(sys.argv[1:])
+    if code is None:
+        time.sleep(300)  # the interface
+    raise SystemExit(code)
+''')
+
+
+class PackagedWorkerTests(RunnerCase):
+    """The packaged program as its own supervised worker: dispatch, request check, pipes, supervision."""
+
+    def setUp(self):
+        super().setUp()
+        self.stand_in = self.folder / "packaged_stand_in.py"
+        self.stand_in.write_text(STAND_IN.format(src=str(ROOT / "src")), encoding="utf-8")
+        self.packaged = [sys.executable, str(self.stand_in)]
+
+    def start(self, arguments, request=None):
+        pipes = request is not None
+        done = subprocess.run(
+            self.packaged + list(arguments), input=request if pipes else None,
+            stdin=None if pipes else subprocess.DEVNULL,
+            stdout=subprocess.PIPE if pipes else subprocess.DEVNULL, timeout=120)
+        return done.returncode, [json.loads(line) for line in (done.stdout or b"").splitlines()]
+
+    def test_the_source_command_is_kept_and_the_packaged_program_starts_itself_with_one_argument(self):
+        self.assertFalse(sfr.is_frozen())
+        self.assertEqual(sfr._child_argv(), [sys.executable, "-m", "services.solid_forward_runner", "--child"])
+        with mock.patch.object(sfr.sys, "frozen", True, create=True), \
+                mock.patch.object(sfr.sys, "executable", r"X:\Preview\AbaqusModalComparator.exe"):
+            self.assertTrue(sfr.is_frozen())
+            self.assertEqual(sfr._child_argv(), [r"X:\Preview\AbaqusModalComparator.exe", sfr.WORKER_OPTION])
+        self.assertEqual(sfr.WORKER_OPTION, "--solid-forward-worker")
+
+    def test_only_the_exact_worker_argument_is_a_worker_and_every_other_form_is_refused(self):
+        solved = AssertionError("a calculation was started")
+        with mock.patch.object(sfr, "_child_main", side_effect=solved), \
+                mock.patch.object(sfr, "_inherited_pipes", side_effect=solved):
+            for ordinary in ([], ["--research"], ["C:\\data\\plate.mcproj"], ["--worker"], ["-m", "new_gui"]):
+                self.assertIsNone(sfr.frozen_worker_dispatch(ordinary), ordinary)  # the program starts as usual
+            for malformed in (["-m", "services.solid_forward_runner", "--child"], ["--child"],
+                              [sfr.WORKER_OPTION, "extra"], [sfr.WORKER_OPTION, sfr.WORKER_OPTION],
+                              [sfr.WORKER_OPTION + "=1"], ["--research", sfr.WORKER_OPTION],
+                              ["services/solid_forward_runner.py"]):
+                self.assertTrue(sfr.is_worker_invocation(malformed), malformed)
+                self.assertEqual(sfr.frozen_worker_dispatch(malformed), sfr.EXIT_MALFORMED_INVOCATION, malformed)
+        with mock.patch.object(sfr, "_child_main", side_effect=solved), \
+                mock.patch.object(sfr, "_inherited_pipes", side_effect=sfr.RunnerRefused("no pipe")):
+            self.assertEqual(sfr.frozen_worker_dispatch([sfr.WORKER_OPTION]), sfr.EXIT_NO_PIPES)
+        streams = [mock.Mock(), mock.Mock()]
+        with mock.patch.object(sfr, "_inherited_pipes", return_value=tuple(streams)):
+            with mock.patch.object(sfr, "_child_main", return_value=0) as worker:
+                self.assertEqual(sfr.frozen_worker_dispatch([sfr.WORKER_OPTION]), 0)
+            worker.assert_called_once_with(*streams)  # the inherited pipes, not the interpreter's streams
+            with mock.patch.object(sfr, "_child_main", side_effect=RuntimeError("unexpected")):
+                self.assertEqual(sfr.frozen_worker_dispatch([sfr.WORKER_OPTION]), sfr.EXIT_WORKER_CRASH)  # never raised
+        self.assertEqual(len({sfr.EXIT_MALFORMED_INVOCATION, sfr.EXIT_NO_PIPES, sfr.EXIT_MALFORMED_REQUEST,
+                              sfr.EXIT_WORKER_CRASH, 0, 1, 2, 3}), 8)
+
+    def test_a_malformed_request_is_refused_before_anything_is_imported_or_solved(self):
+        import io
+
+        good = {"inp_path": "box.inp", "inp_sha256": "0" * 64, "elastic_modes": 14, "guard_modes": 4,
+                "max_memory_bytes": 1 << 30, "max_seconds": 60.0, "points": [[1.0, 2.0, 3.0]]}
+        self.assertEqual(sfr._read_request(io.StringIO(json.dumps(good) + "\n")), good)
+        self.assertEqual(sfr._read_request(io.BytesIO(json.dumps(good).encode() + b"\n")), good)
+        bad = ["", "\n", "not json\n", "[1, 2]\n", "{}\n"]
+        for key, value in (("inp_path", ""), ("inp_path", 5), ("inp_sha256", "abc"), ("inp_sha256", "G" * 64),
+                           ("elastic_modes", 0), ("elastic_modes", "14"), ("elastic_modes", True), ("guard_modes", -1),
+                           ("max_memory_bytes", 0), ("max_seconds", 0), ("max_seconds", "60"), ("points", "x"),
+                           ("points", [[1.0, 2.0]]), ("points", [[1.0, 2.0, "3"]]), ("points", [[1.0, 2.0, 3.0]] * 4)):
+            bad.append(json.dumps(dict(good, **{key: value})) + "\n")
+        for missing in good:
+            if missing != "points":
+                bad.append(json.dumps({k: v for k, v in good.items() if k != missing}) + "\n")
+        for line in bad:
+            with self.subTest(line=line[:60]):
+                with self.assertRaises(sfr.RunnerRefused) as caught:
+                    sfr._read_request(io.StringIO(line))
+                self.assertIn("Malformed worker request", str(caught.exception))
+                out = io.StringIO()
+                with mock.patch.object(sm, "load_solid_inp", side_effect=AssertionError("imported a model")), \
+                        mock.patch.object(sfr, "sha256_of", side_effect=AssertionError("opened the INP")):
+                    self.assertEqual(sfr._child_main(io.StringIO(line), out), sfr.EXIT_MALFORMED_REQUEST)
+                events = [json.loads(e) for e in out.getvalue().splitlines()]
+                self.assertEqual([e["event"] for e in events], ["hello", "error"])
+                self.assertEqual(events[1]["kind"], "MALFORMED_REQUEST")
+                self.assertIn("Nothing was solved", events[1]["message"])
+
+    @WINDOWS_ONLY
+    def test_the_packaged_single_solve_matches_the_source_worker_and_the_in_process_solver(self):
+        request = self.request()
+        stages = []
+        packaged = sfr.run(request, child_argv=self.packaged + [sfr.WORKER_OPTION],
+                           progress=lambda event: stages.append(event.get("stage")))
+        self.assertEqual(packaged.status, sfr.SOLVED, packaged.message)
+        self.assertTrue(packaged.worker_in_job)
+        self.assertGreater(packaged.peak_job_memory_bytes, 0)
+        self.assertGreater(packaged.peak_worker_commit_bytes, 0)
+        self.assertTrue({"preflight", "worker verified", "import", "assemble stiffness", "factorise"} <= set(stages))
+        self.assertNothingLeft(packaged)
+        source = sfr.run(request)
+        self.assertEqual(source.status, sfr.SOLVED, source.message)
+        self.assertEqual(packaged.result["frequencies_hz"], source.result["frequencies_hz"])  # the same lines
+        self.assertEqual(packaged.result["material"], source.result["material"])
+        direct = ss.SolidForwardModel(sm.load_solid_inp(request.inp_path)).solve(14)
+        np.testing.assert_allclose(packaged.result["frequencies_hz"], direct.frequencies_hz, rtol=1e-10)
+        self.assertEqual(packaged.result["abaqus_equivalence"], "NOT_VERIFIED")
+
+    @WINDOWS_ONLY
+    def test_the_packaged_what_if_route_matches_independent_solves(self):
+        base = self.request()
+        points = THREE[1:]
+        outcome = sfr.run(sfr.ForwardRequest(base.inp_path, base.inp_sha256, points=points),
+                          child_argv=self.packaged + [sfr.WORKER_OPTION])
+        self.assertEqual(outcome.status, sfr.SOLVED, outcome.message)
+        self.assertEqual(outcome.label, sfr.WHATIF_LABEL)
+        self.assertTrue(outcome.worker_in_job)
+        self.assertEqual([p["status"] for p in outcome.points], [sfr.POINT_SOLVED] * 2)
+        for record, (e1, e2, g12) in zip(outcome.points, points):
+            independent = ss.SolidForwardModel(sm.load_solid_inp(base.inp_path)).solve(14, e1=e1, e2=e2, g12=g12)
+            np.testing.assert_allclose(record["result"]["frequencies_hz"], independent.frequencies_hz, rtol=1e-10)
+        self.assertTrue(outcome.result["reuse"]["mass_matrix_reused_for_every_point"])
+        self.assertNothingLeft(outcome)
+
+    @WINDOWS_ONLY
+    def test_refused_packaged_invocations_end_by_themselves_and_solve_nothing(self):
+        code, events = self.start(["-m", "services.solid_forward_runner", "--child"])
+        self.assertEqual((code, events), (sfr.EXIT_MALFORMED_INVOCATION, []))
+        code, events = self.start([sfr.WORKER_OPTION, "extra"], b"{}\n")
+        self.assertEqual((code, events), (sfr.EXIT_MALFORMED_INVOCATION, []))  # not even the identity line
+        code, events = self.start([sfr.WORKER_OPTION])  # the null device is not a supervisor's pipe
+        self.assertEqual((code, events), (sfr.EXIT_NO_PIPES, []))
+        code, events = self.start([sfr.WORKER_OPTION], b"{}\n")
+        self.assertEqual(code, sfr.EXIT_MALFORMED_REQUEST)
+        self.assertEqual([e["event"] for e in events], ["hello", "error"])
+        self.assertEqual(events[1]["kind"], "MALFORMED_REQUEST")
+        code, events = self.start([sfr.WORKER_OPTION], b"")  # the supervisor closed the pipe without a request
+        self.assertEqual((code, events[-1]["kind"]), (sfr.EXIT_MALFORMED_REQUEST, "MALFORMED_REQUEST"))
+
+    @WINDOWS_ONLY
+    def test_a_failed_packaged_request_is_reported_by_the_supervisor_and_nothing_is_left(self):
+        base = self.request()
+        # the supervisor of the source command given to the packaged program: it ends, it is not taken for a worker
+        refused = sfr.run(base, child_argv=self.packaged + ["-m", "services.solid_forward_runner", "--child"],
+                          skip_preflight=True)
+        self.assertEqual(refused.status, sfr.FAILED)
+        self.assertIn(f"ended without a result (exit code {sfr.EXIT_MALFORMED_INVOCATION})", refused.message)
+        self.assertIsNone(refused.worker_pid)
+        self.assertIsNone(refused.result)
+        self.assertNothingLeft(refused)
+        # a request the worker does not accept: reported, nothing solved
+        malformed = sfr.run(sfr.ForwardRequest(base.inp_path, base.inp_sha256, elastic_modes=0),
+                            child_argv=self.packaged + [sfr.WORKER_OPTION], skip_preflight=True)
+        self.assertEqual(malformed.status, sfr.FAILED)
+        self.assertIn("MALFORMED_REQUEST", malformed.message)
+        self.assertIn("Nothing was solved", malformed.message)
+        self.assertTrue(malformed.worker_in_job)
+        self.assertIsNone(malformed.result)
+        self.assertNothingLeft(malformed)
+        # a changed INP is refused by the packaged worker as by the source worker
+        changed = sfr.run(sfr.ForwardRequest(base.inp_path, "f" * 64), child_argv=self.packaged + [sfr.WORKER_OPTION],
+                          skip_preflight=True)
+        self.assertEqual(changed.status, sfr.FAILED)
+        self.assertIn("changed", changed.message)
+        self.assertNothingLeft(changed)
+        # a start that is no worker at all (the interface would open) never identifies itself: refused and terminated
+        window = sfr.run(base, sfr.RunnerLimits(handshake_seconds=2.0), child_argv=self.packaged, skip_preflight=True)
+        self.assertEqual(window.status, sfr.REFUSED)
+        self.assertIn("identity could not be established", window.message)
+        self.assertNothingLeft(window)
+
+    @WINDOWS_ONLY
+    def test_cancelling_a_packaged_run_terminates_it_and_the_limits_still_hold(self):
+        cancel = threading.Event()
+        base = self.request()
+
+        def progress(event):
+            if event.get("stage") == "worker verified":
+                cancel.set()
+
+        outcome = sfr.run(sfr.ForwardRequest(base.inp_path, base.inp_sha256, points=THREE), progress=progress,
+                          cancel=cancel, child_argv=self.packaged + [sfr.WORKER_OPTION])
+        self.assertEqual(outcome.status, sfr.CANCELLED)
+        self.assertTrue(outcome.worker_in_job)
+        self.assertEqual([p["status"] for p in outcome.points], [sfr.POINT_NOT_RUN] * 3)
+        self.assertNothingLeft(outcome)
+        limited = sfr.run(base, sfr.RunnerLimits(max_job_memory_bytes=10_000),
+                          child_argv=self.packaged + [sfr.WORKER_OPTION])
+        self.assertEqual(limited.status, sfr.REFUSED)  # the memory decision is taken before any worker starts
+        self.assertIsNone(limited.launcher_pid)
 
 
 class UnsupportedPlatformTests(RunnerCase):

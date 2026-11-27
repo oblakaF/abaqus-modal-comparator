@@ -28,7 +28,7 @@ from services import solid_c3d8i_solver as ss  # noqa: E402
 from services import solid_forward_runner as sfr  # noqa: E402
 from test_real_input_1_compatibility import SHELL  # noqa: E402
 from test_solid_c3d8i_model import box_inp  # noqa: E402
-from test_solid_forward_runner import WINDOWS_ONLY  # noqa: E402
+from test_solid_forward_runner import STAND_IN, WINDOWS_ONLY  # noqa: E402
 
 DIMENSIONS = dict(nx=6, ny=3, nz=1, lx=60.0, ly=30.0, lz=5.0)
 
@@ -457,6 +457,45 @@ class SolidPage(unittest.TestCase):
         self.wait(panel)
         self.assertEqual(panel.whatif_fields[0][0].text(), "")
         self.assertIsNone(panel.solid_outcome)
+
+    @WINDOWS_ONLY
+    def test_both_calculations_of_the_page_run_through_the_packaged_worker_command(self):
+        """WINDOWS-PREVIEW-01-SOLID-WORKER-FIX: in the packaged program the page's worker is the program itself with one
+        argument. A Python process stands in for it here (the entry script's question, no interpreter streams); the
+        page, its confirmation and its tables are the same as with the source worker."""
+        stand_in = Path(tempfile.mkdtemp()) / "packaged_stand_in.py"
+        stand_in.write_text(STAND_IN.format(src=str(ROOT / "src")), encoding="utf-8")
+        command = [sys.executable, str(stand_in), sfr.WORKER_OPTION]
+        with mock.patch.object(sfr, "_child_argv", return_value=command) as asked_for:
+            panel = self.checked()
+            self.assertTrue(panel.run_solid())
+            self.wait(panel)
+            outcome = panel.solid_outcome
+            self.assertEqual(outcome.status, sfr.SOLVED, outcome.message)
+            self.assertTrue(outcome.worker_in_job)
+            self.assertEqual([row[1] for row in panel.table_cells("solid_frequencies")],
+                             [f"{f:.4f}" for f in self.direct])
+            diagnostics = self.cells(panel, "solid_diagnostics")
+            self.assertIn("verified inside the supervision job", diagnostics["Worker process"])
+            self.assertEqual(diagnostics["Worker processes still running after the run"], "0")
+            panel.set_whatif(self.POINTS)
+            self.assertTrue(panel.run_whatif())
+            self.wait(panel)
+            whatif = panel.whatif_outcome
+            self.assertEqual(whatif.status, sfr.SOLVED, whatif.message)
+            cells = panel.table_cells("whatif_frequencies")
+            model = sm.load_solid_inp(self.inp)
+            for column, (e1, e2, g12) in zip((1, 2), self.POINTS):
+                expected = ss.SolidForwardModel(model).solve(14, e1=e1, e2=e2, g12=g12).frequencies_hz
+                self.assertEqual([row[column] for row in cells], [f"{f:.4f}" for f in expected])
+            self.assertEqual(self.cells(panel, "whatif_diagnostics")["Worker processes still running after the run"], "0")
+            self.assertEqual(asked_for.call_count, 2)  # one worker per confirmed calculation
+            self.assertEqual(len(self.asked), 2)
+            self.assertTrue(panel.run_whatif())  # cancelling the packaged worker from the page
+            self.assertTrue(panel.cancel_solid())
+            self.wait(panel)
+            self.assertEqual(panel.whatif_outcome.status, sfr.CANCELLED)
+            self.assertIn(panel.whatif_outcome.active_processes_after, (0, None))
 
     def test_without_job_objects_the_page_says_so_and_offers_no_calculation(self):
         """ABM-AUD-2: on a platform without Windows job objects the solid mode is not available. The page says why,

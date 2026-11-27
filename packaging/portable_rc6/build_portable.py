@@ -49,6 +49,11 @@ shows (``check_plate_comparison``: present in the portable folder, the SHA-256 t
 program's reader with four models, 11 records and 11 x 14 matrices), records it in BUILD_INFO.json, and the README
 describes that window.
 
+WINDOWS-PREVIEW-01-SOLID-WORKER-FIX: the packaged program is also the supervised solid worker of Research Tuning
+(``launch_new_gui.py`` asks ``frozen_worker_dispatch`` before any interface module is imported). The build starts the
+finished program as a worker (``check_solid_worker``: refused invocations, an empty request, a request for a missing
+INP; nothing is solved) and stops when one of the starts does not end or answers otherwise; BUILD_INFO.json records it.
+
 Nothing scientific is decided or changed here.
 """
 
@@ -119,6 +124,71 @@ REQUIRED = ("python3*.dll", "base_library.zip", "PySide6/Qt6Core.dll", "PySide6/
             "scipy/spatial/*.pyd", "scipy/signal/*.pyd", "scipy/interpolate/*.pyd", "scipy/stats/*.pyd",
             "matplotlib/ft2font*.pyd", "matplotlib/backends/_backend_agg*.pyd", "matplotlib/mpl-data/matplotlibrc",
             "matplotlib/mpl-data/fonts/ttf/DejaVuSans.ttf", "PIL/_imaging.cp*.pyd", "libcrypto-3.dll", "_hashlib.pyd")
+
+
+# WINDOWS-PREVIEW-01-SOLID-WORKER-FIX: the packaged program is also the supervised solid worker of Research Tuning.
+# The worker imports these inside functions; the specification names them, and check_solid_worker starts the
+# finished program as a worker.
+SOLID_WORKER_MODULES = ("services.solid_forward_runner", "services.solid_c3d8i_model", "services.solid_c3d8i_solver",
+                        "services.solid_c3d8i_forward", "services.matrix_model_service")
+SOLID_WORKER_SECONDS = 180.0  # a start that has not ended by then is refused (the program opened its window)
+
+
+def check_solid_worker(folder: Path, command=None) -> dict:
+    """The finished program, started as the supervised solid worker, behaves as one and never as the interface.
+    Four starts, none of which solves anything: the source command (refused), the worker argument without pipes
+    (refused), an empty request (refused by the worker after it identified itself) and a well-formed request for an INP
+    that does not exist (the worker imports its solver modules, then reports the missing file). A start that does not
+    end is the program's window: the build stops. ``command`` replaces the program in the tests of this check."""
+    sys.path.insert(0, str(REPO / "src"))
+    from services import solid_forward_runner as sfr
+
+    command = [str(folder / EXE)] if command is None else list(command)
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
+
+    def start(name, arguments, request=None):
+        pipes = request is not None
+        try:
+            done = subprocess.run(command + list(arguments), input=request if pipes else None,
+                                  stdin=None if pipes else subprocess.DEVNULL,
+                                  stdout=subprocess.PIPE if pipes else subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                  cwd=folder, env=env, timeout=SOLID_WORKER_SECONDS,
+                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except subprocess.TimeoutExpired:
+            raise SystemExit(f"refused: the program started as a solid worker ({name}) did not end in "
+                             f"{SOLID_WORKER_SECONDS:g} s: a worker invocation must never open the interface")
+        events = []
+        for line in (done.stdout or b"").splitlines():
+            try:
+                events.append(json.loads(line.decode("utf-8")))
+            except ValueError:
+                raise SystemExit(f"refused: the solid worker ({name}) wrote a line that is not a JSON event")
+        return done.returncode, events
+
+    def expect(name, got, wanted):
+        if got != wanted:
+            raise SystemExit(f"refused: the program started as a solid worker ({name}) gave {got}, not {wanted}")
+
+    code, _ = start("source command", ["-m", "services.solid_forward_runner", "--child"])
+    expect("source command", code, sfr.EXIT_MALFORMED_INVOCATION)
+    code, _ = start("no pipes", [sfr.WORKER_OPTION])
+    expect("no pipes", code, sfr.EXIT_NO_PIPES)
+    code, events = start("empty request", [sfr.WORKER_OPTION], b"{}\n")
+    expect("empty request", (code, [e.get("event") for e in events], events[-1].get("kind") if events else None),
+           (sfr.EXIT_MALFORMED_REQUEST, ["hello", "error"], "MALFORMED_REQUEST"))
+    missing = folder / "no such model.inp"
+    request = {"inp_path": str(missing), "inp_sha256": "0" * 64, "elastic_modes": 14, "guard_modes": 4,
+               "max_memory_bytes": 1 << 30, "max_seconds": 60.0, "points": []}
+    code, events = start("missing INP", [sfr.WORKER_OPTION], (json.dumps(request) + "\n").encode("utf-8"))
+    expect("missing INP", (code, [e.get("event") for e in events], events[-1].get("kind") if events else None),
+           (1, ["hello", "error"], "FileNotFoundError"))
+    if not isinstance(events[0].get("pid"), int) or missing.exists():
+        raise SystemExit("refused: the solid worker did not identify itself by its process number")
+    return {"worker_argument": sfr.WORKER_OPTION, "modules": list(SOLID_WORKER_MODULES),
+            "source_command_exit_code": sfr.EXIT_MALFORMED_INVOCATION, "no_pipes_exit_code": sfr.EXIT_NO_PIPES,
+            "empty_request": "hello, error MALFORMED_REQUEST, exit code %d" % sfr.EXIT_MALFORMED_REQUEST,
+            "missing_inp_request": "hello, error FileNotFoundError after the solver modules were imported, exit code 1",
+            "calculations": 0, "interface_opened": False}
 
 
 def left_out(destination: str) -> str:
@@ -577,6 +647,7 @@ def main(argv=None) -> int:
     compact = check_compact(folder)
     research = check_research(folder)
     research["odb_extractor"] = check_extractor(folder)
+    research["solid_worker"] = check_solid_worker(folder)  # the finished program itself, before anything is listed
     built = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     (folder / "README_PORTABLE.txt").write_text(readme(commit, branch, built), encoding="utf-8-sig")  # for Notepad
     count, size = folder_size(folder)

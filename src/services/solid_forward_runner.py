@@ -341,7 +341,23 @@ def preflight(request: ForwardRequest, limits: RunnerLimits = RunnerLimits()) ->
     return info
 
 
+WORKER_OPTION = "--solid-forward-worker"   # the packaged program: the ONE argument that makes it a worker
+EXIT_MALFORMED_REQUEST = 4                 # the worker read no valid request; nothing was solved
+EXIT_WORKER_CRASH = 70                     # packaged worker: an unexpected error, reported by exit code only
+EXIT_MALFORMED_INVOCATION = 64             # packaged program: worker arguments in any form but the exact one
+EXIT_NO_PIPES = 65                         # packaged worker: no inherited stdin/stdout pipes (not started by a supervisor)
+
+
+def is_frozen() -> bool:
+    """The packaged program (PyInstaller): ``sys.executable`` is the program itself, not a Python interpreter."""
+    return bool(getattr(sys, "frozen", False))
+
+
 def _child_argv() -> list:
+    if is_frozen():
+        # WINDOWS-PREVIEW-01-SOLID-WORKER-FIX: the packaged program has no ``-m``; its entry script recognises this
+        # one argument before any interface module is imported (``frozen_worker_dispatch``) and becomes the worker.
+        return [sys.executable, WORKER_OPTION]
     # -m from src: sys.path[0] is src, never the services folder itself
     return [sys.executable, "-m", "services.solid_forward_runner", "--child"]
 
@@ -565,9 +581,47 @@ def _settle_points(outcome: RunnerOutcome, request: ForwardRequest) -> None:
 # ------------------------------------------------------------------------------------------------ child side
 
 
-def _emit(event: dict) -> None:
-    sys.stdout.write(json.dumps(event, default=float) + "\n")
-    sys.stdout.flush()
+def _read_request(stream) -> dict:
+    """The one request line of the supervisor, checked before anything is imported or solved. RunnerRefused when it
+    is missing, not JSON, or not the request ``run`` writes (a calculation never starts from a guessed request)."""
+    import math
+
+    line = stream.readline()
+    if isinstance(line, bytes):
+        line = line.decode("utf-8", errors="replace")
+    if not line.strip():
+        raise RunnerRefused("Malformed worker request: no request was received.")
+    try:
+        spec = json.loads(line)
+    except ValueError:
+        raise RunnerRefused("Malformed worker request: the request is not JSON.") from None
+    if not isinstance(spec, dict):
+        raise RunnerRefused("Malformed worker request: the request is not an object.")
+
+    def whole(name, least):
+        value = spec.get(name)
+        if isinstance(value, bool) or not isinstance(value, int) or value < least:
+            raise RunnerRefused(f"Malformed worker request: {name} must be a whole number of at least {least}.")
+
+    def number(value):
+        return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+
+    if not isinstance(spec.get("inp_path"), str) or not spec["inp_path"].strip():
+        raise RunnerRefused("Malformed worker request: inp_path is missing.")
+    digest = spec.get("inp_sha256")
+    if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+        raise RunnerRefused("Malformed worker request: inp_sha256 is not a SHA-256.")
+    whole("elastic_modes", 1)
+    whole("guard_modes", 0)
+    whole("max_memory_bytes", 1)
+    if not number(spec.get("max_seconds")) or spec["max_seconds"] <= 0:
+        raise RunnerRefused("Malformed worker request: max_seconds must be a positive number.")
+    points = spec.get("points", [])
+    if not isinstance(points, list) or len(points) > MAX_WHATIF_POINTS or any(
+            not isinstance(p, list) or len(p) != 3 or not all(number(v) for v in p) for p in points):
+        raise RunnerRefused(f"Malformed worker request: points must be at most {MAX_WHATIF_POINTS} lists of three "
+                            "numbers.")
+    return spec
 
 
 def _result_payload(result, model) -> dict:
@@ -629,9 +683,22 @@ def solve_points(forward, points, elastic_modes: int, guard_modes: int, emit: Ca
             "points_attempted": len(reused)}
 
 
-def _child_main() -> int:
+def _child_main(stdin=None, stdout=None) -> int:
+    """The worker: one request line in, JSON event lines out. The source worker uses the interpreter's own standard
+    streams; the packaged worker is given the inherited pipes explicitly (``frozen_worker_dispatch``)."""
+    stdin = sys.stdin if stdin is None else stdin
+    stdout = sys.stdout if stdout is None else stdout
+
+    def _emit(event: dict) -> None:
+        stdout.write(json.dumps(event, default=float) + "\n")
+        stdout.flush()
+
     _emit({"event": "hello", "pid": os.getpid()})
-    spec = json.loads(sys.stdin.readline())
+    try:
+        spec = _read_request(stdin)
+    except RunnerRefused as error:
+        _emit({"event": "error", "kind": "MALFORMED_REQUEST", "message": f"{error} Nothing was solved."})
+        return EXIT_MALFORMED_REQUEST
     try:
         import numpy as np
         from services import solid_c3d8i_model as sm
@@ -674,6 +741,79 @@ def _child_main() -> int:
         _emit({"event": "error", "kind": type(error).__name__, "message": str(error),
                "peak_worker_commit_bytes": own_peak_commit_bytes()})
         return 1
+
+
+# ------------------------------------------------------------------------------------------------ packaged worker
+
+STD_INPUT_HANDLE, STD_OUTPUT_HANDLE = -10, -11
+FILE_TYPE_PIPE = 3
+DUPLICATE_SAME_ACCESS = 0x2
+
+
+def is_worker_invocation(arguments) -> bool:
+    """The arguments ask for a worker in ANY form, well formed or not (also the source command given to the packaged
+    program). Such an invocation never opens the interface."""
+    return any(a == "--child" or a.startswith(WORKER_OPTION) or "solid_forward_runner" in a
+               for a in map(str, arguments))
+
+
+def _inherited_pipes():
+    """Text streams on the stdin / stdout PIPES this process inherited from its supervisor. The packaged program is a
+    windowed one: its ``sys.stdin`` / ``sys.stdout`` are not relied on (they may be None); the Win32 standard handles
+    are read, required to be pipes, duplicated and opened. RunnerRefused when either is missing or not a pipe."""
+    import msvcrt
+
+    k = _kernel32()
+    k.GetStdHandle.restype = wintypes.HANDLE
+    k.GetStdHandle.argtypes = (wintypes.DWORD,)
+    k.GetFileType.restype = wintypes.DWORD
+    k.GetFileType.argtypes = (wintypes.HANDLE,)
+    k.DuplicateHandle.argtypes = (wintypes.HANDLE, wintypes.HANDLE, wintypes.HANDLE, ctypes.POINTER(wintypes.HANDLE),
+                                  wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    invalid = wintypes.HANDLE(-1).value
+    streams = []
+    try:
+        for name, std, flags, mode in (("stdin", STD_INPUT_HANDLE, os.O_RDONLY, "r"), ("stdout", STD_OUTPUT_HANDLE, 0, "w")):
+            handle = k.GetStdHandle(wintypes.DWORD(std & 0xFFFFFFFF))
+            if not handle or handle == invalid or k.GetFileType(handle) != FILE_TYPE_PIPE:
+                raise RunnerRefused(f"The worker has no inherited {name} pipe; it is started only by its supervisor.")
+            own = wintypes.HANDLE()
+            me = k.GetCurrentProcess()
+            if not k.DuplicateHandle(me, handle, me, ctypes.byref(own), 0, False, DUPLICATE_SAME_ACCESS):
+                raise RunnerRefused(f"The inherited {name} pipe could not be opened (error {ctypes.get_last_error()}).")
+            streams.append(os.fdopen(msvcrt.open_osfhandle(own.value, flags), mode, encoding="utf-8", newline="\n"))
+    except Exception:
+        for stream in streams:
+            stream.close()
+        raise
+    return tuple(streams)
+
+
+def frozen_worker_dispatch(arguments) -> Optional[int]:
+    """WINDOWS-PREVIEW-01-SOLID-WORKER-FIX: what the packaged program's entry script asks FIRST, before any interface
+    module is imported. ``None``: not a worker invocation, the program starts as usual. Otherwise the process exit
+    code: the interface is never opened. Exactly ``[WORKER_OPTION]`` with inherited stdin / stdout pipes runs the
+    worker (the same request and event lines as the source worker); anything else is refused and nothing is solved.
+    No error escapes: an unexpected one is an exit code, never a window of the windowed program."""
+    arguments = list(arguments)
+    if not is_worker_invocation(arguments):
+        return None
+    if arguments != [WORKER_OPTION]:
+        return EXIT_MALFORMED_INVOCATION
+    try:
+        stdin, stdout = _inherited_pipes()
+    except Exception:  # noqa: BLE001
+        return EXIT_NO_PIPES
+    try:
+        return _child_main(stdin, stdout)
+    except BaseException:  # noqa: BLE001  (also a broken pipe when the supervisor terminated the job)
+        return EXIT_WORKER_CRASH
+    finally:
+        for stream in (stdout, stdin):
+            try:
+                stream.close()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 if __name__ == "__main__" and "--child" in sys.argv:

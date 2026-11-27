@@ -29,7 +29,10 @@ RESEARCH_SERVICES = ["services.research_results_reader", "services.sp10_fe_resea
                      "services.generic_plate_offline_study", "services.plate_physical_review",
                      "services.single_plate_fe_response", "services.plate_study",
                      # RC6: the ODB import adapter and the launcher detection it uses (imported inside functions)
-                     "services.odb_import_service", "abaqus_bridge", "ui_policy"]
+                     "services.odb_import_service", "abaqus_bridge", "ui_policy",
+                     # WINDOWS-PREVIEW-01-SOLID-WORKER-FIX: the packaged program is its own supervised solid worker;
+                     # the worker imports these inside functions (the list is build_portable.SOLID_WORKER_MODULES)
+                     *_build.SOLID_WORKER_MODULES]
 
 a = Analysis(
     [str(Path(SPECPATH) / "launch_new_gui.py")],
