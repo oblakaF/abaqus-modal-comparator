@@ -44,6 +44,11 @@ matplotlib's sample data); the specification applies the list, and the finished 
 parts every function needs (``REQUIRED``). The ZIP is written with the strongest deflate level (still an ordinary ZIP
 that Windows opens).
 
+WINDOWS-PREVIEW-01-REFRESH: the build also checks the current plate comparison snapshot that Help > Research Results
+shows (``check_plate_comparison``: present in the portable folder, the SHA-256 the program records, read by the
+program's reader with four models, 11 records and 11 x 14 matrices), records it in BUILD_INFO.json, and the README
+describes that window.
+
 Nothing scientific is decided or changed here.
 """
 
@@ -155,6 +160,7 @@ START
 THE WINDOW
   The list on the left has five pages: Analyze, Review, MAC / Points, Materials, Research Tuning.
   The File menu has Open Project..., Save Project, Save Project As... and Close Project.
+  The Help menu has About and Research Results... (part 7).
 
 1. ANALYZE - choose the two files and compare
   - FE results (.odb): click Choose file... and pick the Abaqus output database of a frequency analysis.
@@ -215,6 +221,20 @@ THE WINDOW
   Research only: it tunes the assumed inputs of a supported Abaqus shell model against measured frequencies with a
   plate surrogate. No Abaqus run; the result is not a material property. The model must be a flat plate in the
   global XY plane (any constant Z); a curved, folded or tilted shell model is refused with the reason.
+
+7. RESEARCH RESULTS - Help > Research Results...
+  A separate read-only window of stored research records. It opens only from the Help menu and is not one of the
+  five pages. Close returns to the program, which stays on the page it was on.
+  For the single CFRP plate it shows four Abaqus models (Baseline, Thickness only, Directional stiffness only,
+  Combined) against the 11 measured records: the FE inputs, the frequencies with their differences in percent and
+  one 11 x 14 research MAC matrix per model. Four buttons choose the model shown in full.
+  The window is independent of the files chosen on Analyze: it reads none of them and gives nothing to an analysis,
+  so its link line always says NOT VERIFIED. Nothing is calculated, and Abaqus is never started.
+  Tables under a note that begins HISTORICAL were computed with a superseded scan geometry: they are kept as an
+  archived record and are not current results.
+  Every value there is RESEARCH_ONLY, PHYSICAL_REGISTRATION_NOT_VERIFIED and NOT_A_MATERIAL_PROPERTY: no row is a
+  confirmed mode pair and no model is chosen as the best. If the stored file is missing or changed, the window says
+  so and shows no table in its place.
 
 MEMORY
   The program holds the extracted FE mode shapes in memory. In testing, one large sandwich-panel example (about
@@ -327,7 +347,7 @@ def check_research(folder: Path) -> dict:
     results = sf.load_results(folder)
     rows = sf.frequency_diagnostic(results, [(r.exp_no, r.f_exp_hz) for r in snapshot.matching["SP-10"]])
     return {"single_plate_demo": check_demo(folder), "physical_review": check_review(folder),
-            "fe_response": check_fe_response(folder),
+            "fe_response": check_fe_response(folder), "plate_comparison": check_plate_comparison(folder),
             "matching_rows": {k: len(v) for k, v in snapshot.matching.items()},
             "sensitivity_terms": len(snapshot.sensitivities),
             "scenarios": [s.key for s in snapshot.scenarios],
@@ -337,6 +357,33 @@ def check_research(folder: Path) -> dict:
                                "diagnostic_rows": len(rows),
                                "exp11_exp12": [f"EXP{r.exp_no} FE{r.nearest.fe} {r.nearest.df_percent:+.2f} %"
                                                for r in rows[10:]]}}
+
+
+def check_plate_comparison(folder: Path) -> dict:
+    """WINDOWS-PREVIEW-01-REFRESH: the current plate comparison snapshot that Help > Research Results shows is in the
+    portable folder, has the SHA-256 the program records for it, and is read there by the program's own reader with its
+    four models, 11 records and four 11 x 14 matrices. A missing, changed or inconsistent file stops the build."""
+    from services import research_results_reader as rr
+
+    relative, recorded = rr.PLATE_COMPARISON_FILE
+    path = folder.joinpath(*PurePosixPath(relative).parts)
+    if not path.is_file():
+        raise SystemExit(f"refused: the plate comparison snapshot is not in the build: {relative}")
+    digest = hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()  # the committed (LF) form
+    if digest != recorded:
+        raise SystemExit(f"refused: the plate comparison snapshot has SHA-256 {digest}, not the recorded {recorded}")
+    try:
+        comparison = rr.load_plate_comparison(folder)
+    except rr.PlateComparisonRefused as error:
+        raise SystemExit(f"refused: the plate comparison snapshot is not read from the portable folder: {error}")
+    shapes = {key: (len(model.records), len(model.mac), sorted({len(row) for row in model.mac}))
+              for key, model in comparison.models.items()}
+    if tuple(comparison.models) != tuple(rr.PLATE_MODELS) or any(s != (11, 11, [14]) for s in shapes.values()):
+        raise SystemExit(f"refused: the plate comparison snapshot does not hold four models of 11 records and "
+                         f"11 x 14 matrices: {shapes}")
+    return {"path": relative, "bytes": path.stat().st_size, "sha256": comparison.sha256, "recorded_sha256": recorded,
+            "models": list(comparison.models), "records_per_model": 11, "matrix": "11 x 14",
+            "labels": list(comparison.labels)}
 
 
 def check_demo(folder: Path) -> dict:

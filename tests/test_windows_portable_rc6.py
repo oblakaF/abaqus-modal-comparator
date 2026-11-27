@@ -184,7 +184,8 @@ class PortableRc6PackagingTests(unittest.TestCase):
         self.assertIn("length a, width b and mass", ritz)
         self.assertIn("matrix package", stage)
         # no page, command or route of the earlier research window, and no RC6 name as the release
-        for obsolete in ("Workspace", "Plate Study", "Research Results", "Extract modal results", "Physical Readiness",
+        # WINDOWS-PREVIEW-01-REFRESH: "Research Results" is now the Help command of this window (its own test below)
+        for obsolete in ("Workspace", "Plate Study", "Extract modal results", "Physical Readiness",
                          "FE Response", "Research Workbench", "Choose a known new experimental source", "Use this package",
                          "manifest.json", "new interface (", "RC5"):
             self.assertNotIn(obsolete, text, obsolete)
@@ -318,6 +319,81 @@ class PortableRc6PackagingTests(unittest.TestCase):
         self.assertEqual(result["matching_rows"], {"PLATE": 11, "SP-13": 12, "SP-10": 12})
         fe = result["fe_response"]
         self.assertEqual((fe["status"], fe["terms"], fe["fe7_f0_hz"]), ("ARCHIVED_FE_RESULT", 13, 19.07217))
+
+    # ---- WINDOWS-PREVIEW-01-REFRESH
+    def test_the_readme_describes_help_research_results(self):
+        from new_gui import production_window as pw, research_results_model as rm, research_results_panel as rp
+        from services import research_results_reader as rr
+
+        text = self.build.readme("0" * 40, "some-branch", "2026-01-01T00:00:00Z")
+        lines = text.splitlines()
+        self.assertEqual(pw.RESEARCH_ACTION, "Research Results...")
+        self.assertIn("The Help menu has About and Research Results... (part 7).", text)
+        start = lines.index("7. RESEARCH RESULTS - Help > Research Results...")
+        part = "\n".join(lines[start:lines.index("MEMORY")])
+        for title in rm.PLATE_MODEL_TITLES.values():  # the four models by the names of their buttons
+            self.assertIn(title, part, title)
+        self.assertEqual(len(rm.PLATE_MODEL_TITLES), 4)
+        for words in ("separate read-only window", "opens only from the Help menu", "not one of the\n  five pages",
+                      "11 measured records", "11 x 14 research MAC matrix", "independent of the files chosen on Analyze",
+                      "NOT VERIFIED", "Nothing is calculated", "Abaqus is never started", "HISTORICAL",
+                      "superseded scan geometry", "not current results", "no row is a\n  confirmed mode pair",
+                      "missing or changed", *rr.PLATE_COMPARISON_LABELS[:3]):
+            self.assertIn(words, part, words)
+        self.assertIn("RESEARCH ONLY", rp.DIALOG_TITLE)  # the window the part describes is the labelled one
+        # the five pages are still the window's navigation; the dialog is no sixth page and no earlier research page
+        self.assertIn("five pages: " + ", ".join(pw.PAGES) + ".", text)
+        self.assertEqual([line[:2] for line in lines if line[:1].isdigit()], ["1.", "2.", "3.", "4.", "5.", "6.", "7."])
+        self.assertEqual(text.count("Research Results"), 2)  # the Help menu line and the part's heading
+        self.assertLessEqual(max(len(line) for line in lines), 120)
+
+    def test_the_plate_comparison_snapshot_is_verified_in_the_portable_folder(self):
+        from services import research_results_reader as rr
+
+        relative, recorded = rr.PLATE_COMPARISON_FILE
+        self.assertIn(relative, self.build.tracked_documents())  # shipped with the other reference files
+        with tempfile.TemporaryDirectory(prefix="RC6 snapshot ") as folder:
+            root = Path(folder)
+            self.build.copy_documents(root)
+            packaged = root.joinpath(*relative.split("/"))
+            self.assertEqual(hashlib.sha256(packaged.read_bytes().replace(b"\r\n", b"\n")).hexdigest(), recorded)
+            result = self.build.check_plate_comparison(root)
+            self.assertEqual(result["sha256"], recorded)
+            self.assertEqual(result["recorded_sha256"], recorded)
+            self.assertEqual(result["models"], list(rr.PLATE_MODELS))
+            self.assertEqual((len(result["models"]), result["records_per_model"], result["matrix"]), (4, 11, "11 x 14"))
+            self.assertEqual(result["labels"][:3], ["RESEARCH_ONLY", "PHYSICAL_REGISTRATION_NOT_VERIFIED",
+                                                    "NOT_A_MATERIAL_PROPERTY"])
+            self.assertEqual(self.build.check_research(root)["plate_comparison"], result)  # part of the build's checks
+            self.assertEqual(self.build.forbidden_files(root), [])  # it is a reference file, not a measurement
+            original = packaged.read_bytes()
+            for name, damaged in (("changed", original.replace(b'"FAIL"', b'"PASS"')), ("truncated", original[:2000]),
+                                  ("empty", b"")):
+                with self.subTest(case=name):
+                    packaged.write_bytes(damaged)
+                    with self.assertRaises(SystemExit) as refused:
+                        self.build.check_plate_comparison(root)
+                    self.assertIn("refused: the plate comparison snapshot", str(refused.exception))
+                    with self.assertRaises(SystemExit):
+                        self.build.check_research(root)  # the build stops; no package is written after it
+            packaged.unlink()
+            with self.assertRaises(SystemExit) as refused:
+                self.build.check_plate_comparison(root)
+            self.assertIn("is not in the build", str(refused.exception))
+
+    def test_the_packaged_program_holds_the_research_dialog_and_its_reader(self):
+        """The frozen program takes every new_gui module and the reader by name; the snapshot is beside the program."""
+        spec = (PACKAGING / "AbaqusModalComparator_RC6.spec").read_text(encoding="utf-8")
+        self.assertIn('collect_submodules("new_gui")', spec)
+        self.assertIn('"services.research_results_reader"', spec)
+        self.assertTrue((ROOT / "src" / "new_gui" / "research_results_panel.py").is_file())
+        from services import research_results_reader as rr
+
+        # a frozen module's __file__ is _internal\services\<module>.pyc: parents[2] is the portable folder, where docs lie
+        frozen = Path("X:/portable/_internal/services/research_results_reader.pyc")
+        self.assertEqual(frozen.parents[2] / rr.PLATE_COMPARISON_FILE[0],
+                         Path("X:/portable") / "docs/research/plate_only/plate_comparison_261027.json")
+        self.assertEqual(rr.REPO, Path(rr.__file__).resolve().parents[2])
 
     def test_package_list_zip_and_forbidden_files(self):
         with tempfile.TemporaryDirectory(prefix="RC6 package ") as folder:
