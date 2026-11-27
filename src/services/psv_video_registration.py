@@ -27,6 +27,16 @@ stores video coordinates in more than one unit frame.
   it is kept only for the reproduction of those records and must be selected explicitly.
 
 There is no fallback from one reading to the other: a refusal of the instrument reading is the result.
+
+Turned scan grid (PSV-SCAN-OBJECT-MARGIN-01). The operator may turn the scan grid inside its rectangular scan
+object. The file stores the angle (``scan_grid_rotation``); the points then lie on the object's grid turned about
+the object's centre, and their hull is wider than the object by the same amount on all four sides (3.7 to 7.4 px
+in the sandwich sessions with 0.5 to 1.0 degree). The instrument reading accepts such a file by a second, separately
+named rule (``RULE_ROTATED_GRID``): the points, turned back by the STORED angle, must coincide with the scan
+object at the unchanged tolerance under exactly one pair of stored frames. Nothing is fitted, scaled or widened.
+The record names the rule and carries the stored angle, the signed margins and every trial; the instrument's
+metric export (UNV) is recorded as a second witness and can only refuse. A record accepted without a rotation
+keeps exactly its earlier form.
 """
 
 from __future__ import annotations
@@ -60,6 +70,9 @@ MEASPOINT_UV_OFFSET = 106  # byte offset of (u, v) float32 of record 0 (validate
 MEASPOINT_FRAME_OFFSET = 21  # full-frame rectangle in the MeasPoints header (cross-checked, never trusted alone)
 FRAME_COPY_TOLERANCE = 1.0e-5  # stored copies of one rectangle (float32) must agree to this
 NORMALISATION_MATCH_TOL_PX = 0.25  # scan-point hull against the stored scan object, in frame pixels
+SCAN_GRID_ROTATION_OFFSET = 80  # int16 in ScanObjects: rotation of the scan grid inside its scan object
+SCAN_GRID_ROTATION_PER_TURN = 65536.0  # the stored value is a binary angle
+RULE_ROTATED_GRID = "scan-object-with-stored-grid-rotation"  # acceptance rule of a file with a turned scan grid
 
 
 class PSVRegistrationError(ValueError):
@@ -222,6 +235,29 @@ def scan_object_rectangle(blob: bytes) -> tuple[float, float, float, float]:
     return rect
 
 
+def scan_grid_rotation(blob: bytes) -> tuple[int, float]:
+    """Rotation of the scan grid inside its scan object as the file stores it: (stored value, degrees).
+
+    PSV-SCAN-OBJECT-MARGIN-01. Layout: int16 at byte 80 of ``ScanObjects``, a binary angle of 65536 per turn.
+    Zero is a grid parallel to the scan object. The operator may turn the grid inside the unchanged rectangle;
+    the scan points then lie on the rectangle's grid turned about the rectangle's centre, and their hull is wider
+    than the rectangle on all four sides. The sign is that of :func:`_turned_back`.
+    """
+    if len(blob) < SCAN_GRID_ROTATION_OFFSET + 2:
+        raise PSVRegistrationError("ScanObjects: the stream is too short to hold the scan-grid rotation")
+    stored = struct.unpack_from("<h", blob, SCAN_GRID_ROTATION_OFFSET)[0]
+    return int(stored), stored * 360.0 / SCAN_GRID_ROTATION_PER_TURN
+
+
+def _turned_back(points_px: np.ndarray, centre_px: np.ndarray, degrees: float) -> np.ndarray:
+    """The pixels of the scan points with the stored grid rotation undone about ``centre_px`` (a rigid rotation
+    in the frame; no scale, no fit). Used only to compare the points with the scan object."""
+    t = math.radians(degrees)
+    c, s = math.cos(t), math.sin(t)
+    d = np.asarray(points_px, dtype=float) - centre_px
+    return np.column_stack([c * d[:, 0] + s * d[:, 1], -s * d[:, 0] + c * d[:, 1]]) + centre_px
+
+
 def _to_pixels(points: np.ndarray, frame: Sequence[float], size: Sequence[int]) -> np.ndarray:
     u0, v0, u1, v1 = frame
     points = np.asarray(points, dtype=float)
@@ -287,16 +323,50 @@ def resolve_pixel_normalisation(uv: np.ndarray, frame_px: Sequence[int], *, meas
             trials.append({"scan_object_in": object_name, "scan_points_in": points_name, "hull_mismatch_px": mismatch})
             if mismatch <= NORMALISATION_MATCH_TOL_PX:
                 consistent.append((object_name, points_name))
+    # PSV-SCAN-OBJECT-MARGIN-01: a scan grid the operator turned inside its scan object. The file stores the angle.
+    # Only when no pair is consistent as stored and the stored angle is not zero: the SAME comparison at the SAME
+    # tolerance, with the points turned back by the stored angle about the centre of the scan object. The points
+    # are not scaled, the angle is not fitted and the tolerance is not widened; exactly one pair must remain.
+    rotation = None
     if not consistent:
+        stored, degrees = scan_grid_rotation(scan_objects)
+        if stored != 0:
+            turned_trials = []
+            for trial in trials:
+                object_px = _to_pixels(object_corners, frames[trial["scan_object_in"]], size)
+                points_px = _to_pixels(uv, frames[trial["scan_points_in"]], size)
+                outside = {"left": float(object_px[0, 0] - points_px[:, 0].min()),
+                           "right": float(points_px[:, 0].max() - object_px[1, 0]),
+                           "top": float(object_px[0, 1] - points_px[:, 1].min()),
+                           "bottom": float(points_px[:, 1].max() - object_px[1, 1])}
+                back = _turned_back(points_px, object_px.mean(0), degrees)
+                mismatch = float(np.abs(np.array([back.min(0), back.max(0)]) - object_px).max())
+                turned_trials.append({**trial, "hull_outside_scan_object_px": outside,
+                                      "turned_back_hull_mismatch_px": mismatch})
+                if mismatch <= NORMALISATION_MATCH_TOL_PX:
+                    consistent.append((trial["scan_object_in"], trial["scan_points_in"]))
+            rotation = {"rule": RULE_ROTATED_GRID, "stored_value": stored, "degrees": degrees,
+                        "stream": "ScanObjects", "byte_offset": SCAN_GRID_ROTATION_OFFSET,
+                        "units_per_turn": SCAN_GRID_ROTATION_PER_TURN, "trials": turned_trials}
+    if not consistent:
+        described = "; ".join(
+            f"object in {t['scan_object_in']}, points in {t['scan_points_in']}: {t['hull_mismatch_px']:.2f} px"
+            for t in trials)
+        if rotation is not None:
+            described += (f"; with the points turned back by the stored grid rotation {rotation['degrees']:.4f} deg: "
+                          + ", ".join(f"{t['turned_back_hull_mismatch_px']:.2f} px" for t in rotation["trials"]))
         raise PSVRegistrationError(
             "pixel normalisation is not supported: under no stored frame does the scan-point hull coincide with "
-            "the stored scan object (" + "; ".join(
-                f"object in {t['scan_object_in']}, points in {t['scan_points_in']}: {t['hull_mismatch_px']:.2f} px"
-                for t in trials) + ")")
+            "the stored scan object (" + described + ")")
     if len(consistent) > 1:
         raise PSVRegistrationError("pixel normalisation is ambiguous: more than one pair of stored frames is "
                                    f"consistent with the scan object ({consistent})")
     object_name, points_name = consistent[0]
+    if rotation is not None:
+        accepted = next(t for t in rotation["trials"]
+                        if (t["scan_object_in"], t["scan_points_in"]) == (object_name, points_name))
+        rotation["hull_outside_scan_object_px"] = accepted["hull_outside_scan_object_px"]
+        rotation["turned_back_hull_mismatch_px"] = accepted["turned_back_hull_mismatch_px"]
     record = {
         "mode": NORMALISATION_INSTRUMENT,
         "full_frame_rectangle": list(full),
@@ -312,7 +382,42 @@ def resolve_pixel_normalisation(uv: np.ndarray, frame_px: Sequence[int], *, meas
         "match_tolerance_px": NORMALISATION_MATCH_TOL_PX,
         "trials": trials,
     }
+    if rotation is not None:  # a record accepted by the first rule keeps exactly its earlier form
+        record["acceptance_rule"] = RULE_ROTATED_GRID
+        record["scan_grid_rotation"] = rotation
     return PixelNormalisation(tuple(frames[points_name]), tuple(frames[object_name]), size, record)
+
+
+def _metric_export_check(points_px: np.ndarray, unv_mm: np.ndarray, resolved: PixelNormalisation,
+                         size: Sequence[int]) -> dict:
+    """The instrument's own metric export of the scan points (the UNV node table) against their pixels, for a file
+    accepted with a turned scan grid: millimetres per pixel along x over along y (affine fit; no modal quantity).
+
+    It is a second, independent witness of the frame, and it can only refuse. Read in another stored frame, the
+    pixels would be stretched along x by the ratio of the two frames, and the export would show that ratio. If the
+    measured ratio is nearer to the ratio of another stored frame than to 1, the export contradicts the frame."""
+    design = np.column_stack([points_px, np.ones(len(points_px))])
+    coef, *_ = np.linalg.lstsq(design, unv_mm, rcond=None)
+    matrix = coef[:2].T
+    ratio = float(math.hypot(matrix[0, 0], matrix[1, 0]) / math.hypot(matrix[0, 1], matrix[1, 1]))
+    residual = np.linalg.norm(design @ coef - unv_mm, axis=1)
+
+    def aspect(frame):  # pixels per unit along u over along v
+        return (size[0] / (frame[2] - frame[0])) / (size[1] / (frame[3] - frame[1]))
+
+    stored = {"full-frame rectangle": resolved.record["full_frame_rectangle"]}
+    if resolved.record["default_point_list_frame"] is not None:
+        stored["default point-list frame"] = resolved.record["default_point_list_frame"]
+    own = aspect(resolved.points_frame)
+    others = {name: aspect(frame) / own for name, frame in stored.items()
+              if abs(math.log(aspect(frame) / own)) > 1.0e-6}
+    for name, expected in others.items():
+        if abs(math.log(ratio / expected)) <= abs(math.log(ratio)):
+            raise PSVRegistrationError(
+                f"pixel normalisation is contradicted by the instrument's metric export: millimetres per pixel "
+                f"along x over y is {ratio:.4f}, nearer to {expected:.4f} (scan points in the {name}) than to 1")
+    return {"mm_per_px_x_over_y": ratio, "affine_residual_rms_mm": float(np.sqrt(np.mean(residual ** 2))),
+            "ratio_if_points_were_in_another_stored_frame": others}
 
 
 def alignment_points(blob: bytes) -> np.ndarray:
@@ -490,6 +595,8 @@ def reconstruct(svd_bytes: bytes, unv_xy_m: np.ndarray, unv_node_ids: Sequence[i
         cv, *_ = np.linalg.lstsq(design, align_px[:, 1], rcond=None)
         pixel_record = dict(resolved.record)
         pixel_record["scanner_angle_isotropy_dpx_x_over_dpx_y"] = float(abs(cu[1]) / abs(cv[2]))
+        if "scan_grid_rotation" in pixel_record:
+            pixel_record["instrument_metric_export"] = _metric_export_check(px, unv_mm, resolved, (width, height))
 
     # 3. panel edges in the stored frame; physical panel frame through the four corners
     gray = np.asarray(image.convert("L"), dtype=float)

@@ -63,10 +63,11 @@ def defaults_blob(rectangle, point_frame) -> bytes:
     return bytes(blob)
 
 
-def scan_objects_blob(rect, *, objects=1, corners=None) -> bytes:
+def scan_objects_blob(rect, *, objects=1, corners=None, rotation=0) -> bytes:
     u0, v0, u1, v1 = rect
     outline = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)] if corners is None else corners
     blob = bytearray(140)
+    struct.pack_into("<hh", blob, V.SCAN_GRID_ROTATION_OFFSET, rotation, 1)  # the stored rotation of the scan grid
     struct.pack_into("<5i", blob, 0, 2, objects, 3, 3, 101)
     struct.pack_into("<4f", blob, 20, *rect)
     struct.pack_into("<3i", blob, 36, 1, 8, len(outline))
@@ -175,16 +176,25 @@ class SyntheticCase:
     """A panel of known size with a known scan grid, stored the way a PSV file stores it."""
 
     def __init__(self, *, size=(1920, 1080), full=FULL_16_9, points_frame=POINTS_4_3, list_frame="same",
-                 plate=(480, 1320, 60, 1020), margin=20, n=9, default_v=(0.0, 1.0)):
+                 plate=(480, 1320, 60, 1020), margin=20, n=9, default_v=(0.0, 1.0), rotation=0, turned_deg=None,
+                 stretch=1.0, object_frame=None):
+        """``rotation`` is the value the file stores for a scan grid turned inside its scan object (65536 per turn).
+        The grid is turned by that angle about the object's centre unless ``turned_deg`` says otherwise;
+        ``stretch`` scales the grid about the centre instead (a grid that does NOT lie on the scan object)."""
         self.size, self.full, self.points_frame, self.plate = size, full, points_frame, plate
+        self.rotation = rotation
         left, right, top, bottom = plate
         self.panel_mm = ((right - left) / 2.0, (bottom - top) / 2.0)  # 2 px per mm on both axes
         xs, ys = np.linspace(left + margin, right - margin, n), np.linspace(top + margin, bottom - margin, n)
         self.true_px = np.array([[x, y] for y in ys for x in xs])
+        hull = np.array([self.true_px.min(0), self.true_px.max(0)])  # the scan object: the grid before it is turned
+        degrees = rotation * 360.0 / 65536.0 if turned_deg is None else turned_deg
+        t, d = np.radians(degrees), (self.true_px - hull.mean(0)) * stretch
+        self.true_px = np.column_stack([np.cos(t) * d[:, 0] - np.sin(t) * d[:, 1],
+                                        np.sin(t) * d[:, 0] + np.cos(t) * d[:, 1]]) + hull.mean(0)
         self.true_mm = np.column_stack([(self.true_px[:, 0] - left) / 2.0, (bottom - self.true_px[:, 1]) / 2.0])
         self.uv = to_uv(self.true_px, points_frame, size).astype(np.float32).astype(float)
-        hull = np.array([self.true_px.min(0), self.true_px.max(0)])
-        self.object_rect = tuple(to_uv(hull, full, size).ravel())
+        self.object_rect = tuple(to_uv(hull, full if object_frame is None else object_frame, size).ravel())
         self.default_rect = (full[0], default_v[0], full[2], default_v[1])
         self.list_frame = points_frame if list_frame == "same" else list_frame
         self.ids = list(range(1, len(self.uv) + 1))
@@ -192,7 +202,8 @@ class SyntheticCase:
 
     def blobs(self) -> dict[str, bytes]:
         return {"measpoints": measpoints_blob(self.uv, self.full), "defaults": defaults_blob(self.default_rect, self.list_frame),
-                "scan_objects": scan_objects_blob(self.object_rect), "video_settings": video_settings_blob(self.full, self.size)}
+                "scan_objects": scan_objects_blob(self.object_rect, rotation=self.rotation),
+                "video_settings": video_settings_blob(self.full, self.size)}
 
     def resolve(self, **override):
         blobs = self.blobs()
@@ -522,6 +533,311 @@ class HistoricalReproducibilityTests(unittest.TestCase):
                 self.assertIn("default_rectangle_u", record["pixel_normalisation"])
 
 
+# ----------------------------------------------------------------------------- PSV-SCAN-OBJECT-MARGIN-01
+
+V1_PIXEL_KEYS = {"default_rectangle_u", "default_rectangle_v", "frame_px", "px_per_u", "px_per_v",
+                 "scanner_angle_isotropy_du_dv"}
+V2_PIXEL_KEYS = {"mode", "full_frame_rectangle", "default_settings_rectangle", "default_point_list_frame",
+                 "scan_object_rectangle", "scan_points_hull_uv", "frame_px", "scan_points_frame", "scan_object_frame",
+                 "px_per_u", "px_per_v", "match_tolerance_px", "trials", "scanner_angle_isotropy_dpx_x_over_dpx_y"}
+SAME_UNIT = dict(full=(-0.25, 0.0, 1.0, 1.0), points_frame=(-0.25, 0.0, 1.0, 1.0), list_frame=(0.0, 0.0, 1.25, 1.0))
+
+
+class TurnedScanGridTests(unittest.TestCase):
+    """A scan grid the operator turned inside its scan object: the file stores the angle, the hull of the points is
+    wider than the object on all four sides, and the frame is still decided by the stored metadata alone."""
+
+    def test_the_stored_rotation_is_read_as_a_binary_angle(self):
+        for stored, degrees in ((0, 0.0), (127, 0.69763), (-182, -0.99976), (-91, -0.49988), (16384, 90.0)):
+            value, angle = V.scan_grid_rotation(scan_objects_blob((0.1, 0.1, 0.9, 0.9), rotation=stored))
+            self.assertEqual(value, stored)
+            self.assertAlmostEqual(angle, degrees, places=4)
+        self.assertEqual((V.SCAN_GRID_ROTATION_OFFSET, V.SCAN_GRID_ROTATION_PER_TURN), (80, 65536.0))
+        with self.assertRaisesRegex(PSVRegistrationError, "too short"):
+            V.scan_grid_rotation(bytes(81))
+
+    def test_symmetric_margins_are_accepted_by_the_separate_rule_at_the_unchanged_tolerance(self):
+        self.assertEqual(V.NORMALISATION_MATCH_TOL_PX, 0.25)  # not widened
+        for stored in (127, -182, -91, 300):
+            with self.subTest(stored=stored):
+                case = SyntheticCase(rotation=stored)
+                n = case.resolve()
+                record = n.record
+                self.assertEqual(record["acceptance_rule"], V.RULE_ROTATED_GRID)
+                self.assertEqual(record["scan_points_frame"]["name"], "default point-list frame")
+                self.assertEqual(record["scan_object_frame"]["name"], "full-frame rectangle")
+                self.assertEqual(record["match_tolerance_px"], 0.25)
+                # the points are where the file stores them: turned, not moved onto the scan object
+                self.assertLess(np.abs(n.points_px(case.uv) - case.true_px).max(), 1e-3)
+                turn = record["scan_grid_rotation"]
+                self.assertEqual((turn["stored_value"], turn["stream"], turn["byte_offset"]), (stored, "ScanObjects", 80))
+                self.assertAlmostEqual(turn["degrees"], stored * 360.0 / 65536.0, places=9)
+                outside = turn["hull_outside_scan_object_px"]
+                expected = 0.5 * 800.0 * abs(np.sin(np.radians(turn["degrees"]))) - 400.0 * (1 - np.cos(np.radians(turn["degrees"])))
+                for side in ("left", "right", "top", "bottom"):  # 800 x 920 px grid: the margin of the short side
+                    self.assertGreater(outside[side], V.NORMALISATION_MATCH_TOL_PX)
+                self.assertAlmostEqual(outside["top"], outside["bottom"], delta=0.01)
+                self.assertAlmostEqual(outside["left"], outside["right"], delta=0.01)
+                self.assertAlmostEqual(outside["top"], expected, delta=0.05)
+                self.assertLess(turn["turned_back_hull_mismatch_px"], 0.01)
+                # as stored, no pair coincides; turned back, exactly one does
+                self.assertTrue(all(t["hull_mismatch_px"] > 0.25 for t in record["trials"]))
+                passed = [t for t in turn["trials"] if t["turned_back_hull_mismatch_px"] <= 0.25]
+                self.assertEqual([(t["scan_object_in"], t["scan_points_in"]) for t in passed],
+                                 [("full-frame rectangle", "default point-list frame")])
+                self.assertEqual(len(turn["trials"]), 4)
+                self.assertGreater(min(t["turned_back_hull_mismatch_px"] for t in turn["trials"] if t not in passed), 50.0)
+
+    def test_a_record_accepted_without_a_rotation_keeps_its_earlier_form(self):
+        case = SyntheticCase()
+        self.assertEqual(set(case.resolve().record), V2_PIXEL_KEYS - {"scanner_angle_isotropy_dpx_x_over_dpx_y"})
+        self.assertEqual(set(case.reconstruct(V.NORMALISATION_INSTRUMENT).record["pixel_normalisation"]), V2_PIXEL_KEYS)
+        self.assertEqual(set(case.reconstruct(V.NORMALISATION_LEGACY).record["pixel_normalisation"]), V1_PIXEL_KEYS)
+        # a stored rotation too small to matter is accepted by the first rule, as stored
+        tiny = SyntheticCase(rotation=1)
+        self.assertNotIn("acceptance_rule", tiny.resolve().record)
+        # the first rule does not read the rotation: a stream that ends before it is as supported as before
+        short = case.resolve(scan_objects=scan_objects_blob(case.object_rect)[:80])
+        self.assertEqual(short.record, case.resolve().record)
+
+    def test_asymmetric_or_unexplained_margins_are_refused(self):
+        cases = {
+            "turned, no angle stored": SyntheticCase(rotation=0, turned_deg=0.7),
+            "turned by another angle than stored": SyntheticCase(rotation=127, turned_deg=1.5),
+            "turned the other way": SyntheticCase(rotation=127, turned_deg=-0.69763),
+            "angle stored, grid not turned but wider on all sides": SyntheticCase(rotation=127, turned_deg=0.0, stretch=1.0125),
+            "wider on all sides, no angle stored": SyntheticCase(stretch=1.0125),
+            "narrower on all sides, angle stored": SyntheticCase(rotation=-182, turned_deg=0.0, stretch=0.99),
+            "turned and stretched": SyntheticCase(rotation=127, stretch=1.004),
+        }
+        for name, case in cases.items():
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(PSVRegistrationError, "not supported"):
+                    case.resolve()
+                with self.assertRaises(PSVRegistrationError):
+                    case.reconstruct(V.NORMALISATION_INSTRUMENT)
+        shifted = SyntheticCase(rotation=127)  # the turned grid moved off the centre of the scan object by 2 px
+        shifted.uv = to_uv(shifted.true_px + np.array([2.0, 0.0]), shifted.points_frame, shifted.size)
+        with self.assertRaisesRegex(PSVRegistrationError, "not supported") as refused:
+            shifted.resolve()
+        self.assertIn("turned back by the stored grid rotation 0.6976 deg", str(refused.exception))
+
+    def test_a_turned_grid_in_an_ambiguous_file_is_still_refused(self):
+        # scan object and points in one unit, two stored frames of one scale: either frame fits, turned or not
+        with self.assertRaisesRegex(PSVRegistrationError, "ambiguous"):
+            SyntheticCase(**SAME_UNIT).resolve()
+        with self.assertRaisesRegex(PSVRegistrationError, "ambiguous") as refused:
+            SyntheticCase(rotation=127, **SAME_UNIT).resolve()
+        self.assertIn("more than one pair", str(refused.exception))
+        # the points in a frame the file does not store: no rule accepts them
+        with self.assertRaisesRegex(PSVRegistrationError, "not supported"):
+            SyntheticCase(rotation=127, points_frame=(0.0, 0.0, 1.2, 1.0), list_frame=POINTS_4_3).resolve()
+        with self.assertRaisesRegex(PSVRegistrationError, "not supported"):
+            SyntheticCase(rotation=127, points_frame=POINTS_4_3, list_frame=None).resolve()
+
+    def test_missing_metadata_of_a_turned_grid_is_refused(self):
+        case = SyntheticCase(rotation=127)
+        blob = case.blobs()["scan_objects"]
+        with self.assertRaisesRegex(PSVRegistrationError, "too short to hold the scan-grid rotation"):
+            case.resolve(scan_objects=blob[:81])
+        with self.assertRaisesRegex(PSVRegistrationError, "not supported"):
+            case.resolve(scan_objects=blob[:80] + bytes(60))  # the angle lost: the margins are unexplained
+        with self.assertRaisesRegex(PSVRegistrationError, "ScanObjects"):
+            case.reconstruct(V.NORMALISATION_INSTRUMENT, without=("Info/APS_Mixed/MeshObject1/ScanObjects",))
+        with self.assertRaises(PSVRegistrationError):
+            case.resolve(scan_objects=scan_objects_blob(case.object_rect, objects=2, rotation=127))
+
+    def test_reconstruction_of_a_turned_grid_and_the_metric_export_as_a_second_witness(self):
+        case = SyntheticCase(rotation=-182)
+        result = case.reconstruct(V.NORMALISATION_INSTRUMENT)
+        self.assertLess(np.linalg.norm(result.panel_points_mm - case.true_mm, axis=1).max(), 0.6)
+        record = result.record
+        self.assertEqual(record["schema"], V.SCHEMA_INSTRUMENT)  # the same reading; the rule is named in the record
+        pixels = record["pixel_normalisation"]
+        self.assertEqual(set(pixels), V2_PIXEL_KEYS | {"acceptance_rule", "scan_grid_rotation", "instrument_metric_export"})
+        export = pixels["instrument_metric_export"]
+        self.assertAlmostEqual(export["mm_per_px_x_over_y"], 1.0, places=4)
+        self.assertEqual(list(export["ratio_if_points_were_in_another_stored_frame"]), ["full-frame rectangle"])
+        self.assertAlmostEqual(export["ratio_if_points_were_in_another_stored_frame"]["full-frame rectangle"], 0.75, places=5)
+        self.assertIs(record["uses_modal_data"], False)
+        # the v1 reading of the same file is unchanged by the new rule: compressed, and without its keys
+        legacy = case.reconstruct(V.NORMALISATION_LEGACY)
+        self.assertEqual(set(legacy.record["pixel_normalisation"]), V1_PIXEL_KEYS)
+        self.assertAlmostEqual(np.ptp(legacy.panel_points_mm[:, 0]) / np.ptp(result.panel_points_mm[:, 0]), 0.75, delta=0.01)
+        # an instrument export that shows the ratio of the other stored frame contradicts the frame: refused
+        squeezed = SyntheticCase(rotation=-182)
+        squeezed.unv_xy_m = squeezed.unv_xy_m * np.array([0.75, 1.0])
+        with self.assertRaisesRegex(PSVRegistrationError, "contradicted by the instrument's metric export"):
+            squeezed.reconstruct(V.NORMALISATION_INSTRUMENT)
+        plain = SyntheticCase()  # without a rotation the export is not consulted: the earlier behaviour
+        plain.unv_xy_m = plain.unv_xy_m * np.array([0.75, 1.0])
+        self.assertEqual(set(plain.reconstruct(V.NORMALISATION_INSTRUMENT).record["pixel_normalisation"]), V2_PIXEL_KEYS)
+
+    def test_the_rule_takes_nothing_from_the_specimen_or_from_modal_data(self):
+        source = inspect.getsource(V)
+        for word in ("SP-02", "SP02", "SP-13", "SP13", "SP-10", "SP10", "260803", "260910", "260831", "260911"):
+            self.assertNotIn(word, source.replace("M6 / SP-13 gate", ""), word)
+        rule = inspect.getsource(V.resolve_pixel_normalisation) + inspect.getsource(V._turned_back)
+        for word in ("mac", "frequenc", "eigen", "lstsq", "polyfit", "minimi"):  # nothing modal, nothing fitted
+            self.assertNotIn(word, rule.lower(), word)
+        self.assertEqual(rule.count("NORMALISATION_MATCH_TOL_PX"), 3)  # one tolerance: either rule, and the record
+
+
+class NoOverwriteTests(ToolIntegrationTests):
+    """PSV-SCAN-OBJECT-MARGIN-01: the tool never replaces an existing record."""
+
+    def test_an_existing_output_is_refused_before_anything_is_read(self):
+        from unittest import mock
+
+        first = self.run_tool("good.svd", "record.json")
+        stored = (self.root / "record.json").read_bytes()
+        with mock.patch.object(tool(), "build", side_effect=AssertionError("the sources were read")):
+            for extra in ((), ("--normalisation", V.NORMALISATION_LEGACY)):
+                with self.assertRaises(SystemExit) as refused:
+                    self.run_tool("good.svd", "record.json", *extra)
+                self.assertIn("REFUSED", str(refused.exception))
+                self.assertIn("never overwritten", str(refused.exception))
+        self.assertEqual((self.root / "record.json").read_bytes(), stored)
+        self.assertEqual(first["schema"], V.SCHEMA_INSTRUMENT)
+        other = self.root / "notes.json"
+        other.write_text("not a record", encoding="utf-8")
+        with self.assertRaises(SystemExit):
+            self.run_tool("good.svd", "notes.json")
+        self.assertEqual(other.read_text(encoding="utf-8"), "not a record")
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):  # there is no way to force it
+            self.run_tool("good.svd", "record.json", "--overwrite")
+
+    def test_a_file_made_while_the_tool_works_is_kept(self):
+        from unittest import mock
+
+        target = self.root / "late.json"
+        real = tool().build
+
+        def build_then_someone_writes(*args, **kwargs):
+            record = real(*args, **kwargs)
+            target.write_text("written meanwhile", encoding="utf-8")
+            return record
+
+        with mock.patch.object(tool(), "build", side_effect=build_then_someone_writes):
+            with self.assertRaises(SystemExit) as refused:
+                self.run_tool("good.svd", "late.json")
+        self.assertIn("never overwritten", str(refused.exception))
+        self.assertEqual(target.read_text(encoding="utf-8"), "written meanwhile")
+
+    def test_an_accepted_record_is_never_an_output_and_the_example_names_none(self):
+        import hashlib
+
+        for name in ("SP13_physical_registration_reconstruction.json", "SP02_physical_registration_reconstruction.json"):
+            before = hashlib.sha256((EVIDENCE / name).read_bytes()).hexdigest()
+            argv = ["--store", self.STORE, "--svd", "good.svd", "--unv", "scan.unv", "--width-mm", "420", "--height-mm", "480",
+                    "--dimension-source", "synthetic", "--out", str(EVIDENCE / name)]
+            for extra in ((), ("--normalisation", V.NORMALISATION_LEGACY)):
+                with self.assertRaises(SystemExit) as refused:
+                    tool().main(argv + list(extra))
+                self.assertIn("never overwritten", str(refused.exception))
+            self.assertEqual(hashlib.sha256((EVIDENCE / name).read_bytes()).hexdigest(), before)
+        text = tool().__doc__
+        self.assertEqual(text.count("--out "), 1)  # one example, and it writes outside the repository
+        self.assertIn('--out "<work folder>/SP13_260910_reconstruction_v2_DIAGNOSTIC.json"', text)
+        self.assertNotIn("--out docs/", text)
+        self.assertIn("Nothing is overwritten", text)
+        self.assertNotIn("--overwrite", inspect.getsource(tool()).replace('"--overwrite"', ""))
+
+    def test_a_turned_grid_is_written_by_the_default_run_with_its_rule(self):
+        case = SyntheticCase(rotation=127)
+        (self.root / "turned.svd").write_bytes(case.svd())
+        write_unv(self.root / "turned.unv", case.ids, case.unv_xy_m)
+        argv = ["--store", self.STORE, "--svd", "turned.svd", "--unv", "turned.unv", "--width-mm", str(case.panel_mm[0]),
+                "--height-mm", str(case.panel_mm[1]), "--dimension-source", "synthetic", "--out", str(self.root / "turned.json")]
+        with contextlib.redirect_stdout(io.StringIO()):
+            tool().main(argv)
+        record = json.loads((self.root / "turned.json").read_text(encoding="utf-8"))
+        self.assertEqual(record["schema"], V.SCHEMA_INSTRUMENT)
+        self.assertEqual(record["pixel_normalisation"]["acceptance_rule"], V.RULE_ROTATED_GRID)
+        self.assertEqual(record["pixel_normalisation"]["scan_grid_rotation"]["stored_value"], 127)
+
+
+WORK = Path(r"D:\git\abaqus-modal-comparator-work")
+SP10_STORE = WORK / "external_models" / "v2_20261019" / "SP-10" / "temp_12sampls_results_SP10"
+# the four sandwich sessions of PSV-LEGACY-REGISTRATION-RISK-CHECK-01: SVD, its SHA-256, UNV, its SHA-256, panel mm,
+# the stored rotation, the hull margin in px, and the scan-window width with the panel corners of the earlier record
+REAL_SANDWICH = {
+    "SP-02 260803": (Path(r"D:\Snadwich\SP-02\SP02_500by500_Glue420_honeycomb_full_scan_retry_260803.svd"),
+                     "d974608c9dd4aa497edca69b760e917a2a746bcd99c2806f700bf9a4e1462425",
+                     Path(r"D:\Snadwich\SP-02\SP02_polymax_retry_260803.unv"),
+                     "2671db01b6401a9a9bbec7d8c2aa2191b0b35b5ae791756b91c7ccd381a41785", (510.0, 515.0), 127, 5.2, 492.2),
+    "SP-13 260910": (Path(r"D:\Snadwich\SP-13\SP13_a_500by500_Glue420_Auxetic_newSP01_260910.svd"),
+                     "41da4cc1d3a5daa038f558c571128793d44499f09605c7d79f0817b6744b0765",
+                     Path(r"D:\Snadwich\SP-13\SP13_a_polymax.unv"),
+                     "f268023583972f0a9c1660bc60631587e8f3330e4fb7495e52d8310906af39fe", (510.0, 520.0), -182, 7.4, 490.5),
+    "SP-10 260831": (SP10_STORE / "SP10_500by500_Glue420_Honeycomb_PlainFiber_260831.svd",
+                     "16833e048e7c3e40f3d17646a8227d64ec9ec16d258715175b29e41f2fed1c1f",
+                     WORK / "runs" / "m9" / "polymax_zip_members" / "SP10_polymax.unv",
+                     "b20549e6d8a0d747b042157dd4e2fbd2c27820c840ca7625dc4540b9f7a503bb", (520.0, 515.0), -91, 3.7, None),
+    "SP-10 260911 b": (SP10_STORE / "SP10_b_rotated_500by500_Glue420_Honeycomb_PlainFiber_260911.svd",
+                       "c1898e3a0eb2d752382ba930c2e2f067e7127170132ee15bdede841638ac8ca6",
+                       SP10_STORE / "SP10_b_polymax.unv",
+                       "497c7a47a3addff99f2feb8efd13f85accb73ece9d3c4a954181e6d897d38697", (515.0, 520.0), -91, 3.7, 493.3),
+}
+
+
+@unittest.skipUnless(all(row[0].is_file() and row[2].is_file() for row in REAL_SANDWICH.values()),
+                     "the four sandwich PSV sessions are not on this machine")
+class RealSandwichSessionsTests(unittest.TestCase):
+    """The four sandwich sessions (RESEARCH_ONLY / diagnostic; no record is accepted here, no modal data is read)."""
+
+    def test_each_file_is_accepted_by_the_turned_grid_rule_and_only_in_one_pair_of_frames(self):
+        import hashlib
+
+        sys.path.insert(0, str(ROOT / "tools"))
+        from reconstruct_psv_registration import unv_scan_geometry
+
+        for name, (svd, svd_sha, unv, unv_sha, panel, stored, margin, width) in REAL_SANDWICH.items():
+            with self.subTest(name=name):
+                data = svd.read_bytes()
+                self.assertEqual(hashlib.sha256(data).hexdigest(), svd_sha)
+                self.assertEqual(hashlib.sha256(unv.read_bytes()).hexdigest(), unv_sha)
+                ids, xy = unv_scan_geometry(unv)
+                cf = V.CompoundFile(data)
+                meas = cf.read("Info/Geometry/MeasPoints")
+                uv = V.measpoints_uv(meas, len(ids))
+                size = V.video_frame(cf.read("Info/VideoBitmap")).size
+                n = V.resolve_pixel_normalisation(uv, size, measpoints=meas,
+                                                  defaults=cf.read("Info/APS_Mixed/MeshObject1/DefaultSettings"),
+                                                  scan_objects=cf.read("Info/APS_Mixed/MeshObject1/ScanObjects"),
+                                                  video_settings=cf.read("Info/VideoSettings"))
+                record = n.record
+                self.assertEqual(record["acceptance_rule"], V.RULE_ROTATED_GRID)
+                self.assertEqual(record["scan_points_frame"]["name"], "default point-list frame")
+                self.assertEqual(record["scan_object_frame"]["name"], "full-frame rectangle")
+                self.assertAlmostEqual(record["px_per_u"], 1440.0, delta=0.01)
+                turn = record["scan_grid_rotation"]
+                self.assertEqual(turn["stored_value"], stored)
+                self.assertLess(turn["turned_back_hull_mismatch_px"], 0.01)  # as close as the unturned plate grid
+                outside = turn["hull_outside_scan_object_px"]
+                self.assertLess(max(outside.values()) - min(outside.values()), 0.1)
+                self.assertAlmostEqual(outside["left"], margin, delta=0.1)
+                self.assertGreater(min(t["hull_mismatch_px"] for t in record["trials"]), 3.0)  # none as stored
+                others = [t["turned_back_hull_mismatch_px"] for t in turn["trials"]
+                          if (t["scan_object_in"], t["scan_points_in"]) != ("full-frame rectangle", "default point-list frame")]
+                self.assertEqual(len(others), 3)
+                self.assertGreater(min(others), 90.0)
+                # the v1 reading of the same file stays what it was: 0.75 of the width about pixel 960
+                u0, _v0, u1, _v1 = V.default_rectangle(cf.read("Info/APS_Mixed/MeshObject1/DefaultSettings"))
+                legacy_x = (uv[:, 0] - u0) * size[0] / (u1 - u0)
+                self.assertLess(np.abs(legacy_x - (240.0 + 0.75 * n.points_px(uv)[:, 0])).max(), 0.01)
+                if width is None:  # 260831: the unattended bottom-edge fit of this frame is a known open point (M10 3.2)
+                    continue
+                result = V.reconstruct(data, xy, ids, *panel, sources={})
+                self.assertEqual(result.record["schema"], V.SCHEMA_INSTRUMENT)
+                self.assertAlmostEqual(result.record["scan_window_mm"]["width"], width, delta=0.3)
+                self.assertGreater(result.record["scan_window_mm"]["width"] / result.record["scan_window_mm"]["height"], 0.97)
+                export = result.record["pixel_normalisation"]["instrument_metric_export"]
+                self.assertAlmostEqual(export["mm_per_px_x_over_y"], 1.0, delta=0.01)
+                for side, gap in result.record["grid_to_edge_gaps_mm"].items():
+                    self.assertTrue(5.0 < gap < 15.0, (side, gap))
+
+
 @unittest.skipUnless(REAL_SVD.is_file() and REAL_UNV.is_file(), "the 261016 plate measurement is not on this machine")
 class RealPlate261016Tests(unittest.TestCase):
     """Session 261016 of the 0.875 mm plate (RESEARCH_ONLY / PHYSICAL_REGISTRATION_NOT_VERIFIED; README 23, 24)."""
@@ -544,6 +860,10 @@ class RealPlate261016Tests(unittest.TestCase):
         self.assertEqual(len(matching), 1)
         self.assertLess(matching[0]["hull_mismatch_px"], 0.01)
         self.assertGreater(min(t["hull_mismatch_px"] for t in n["trials"] if t not in matching), 100.0)
+        # PSV-SCAN-OBJECT-MARGIN-01: this grid is not turned; it is accepted by the first rule, in its earlier form
+        cf = V.CompoundFile(self.svd)
+        self.assertEqual(V.scan_grid_rotation(cf.read("Info/APS_Mixed/MeshObject1/ScanObjects")), (0, 0.0))
+        self.assertEqual(set(n), V2_PIXEL_KEYS)
 
     def test_window_is_about_287_by_285_mm(self):
         window, gaps = self.result.record["scan_window_mm"], self.result.record["grid_to_edge_gaps_mm"]

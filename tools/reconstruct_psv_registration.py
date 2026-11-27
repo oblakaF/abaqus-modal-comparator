@@ -1,21 +1,25 @@
 """Write the physical scan-to-panel reconstruction record of one stored PSV measurement (read-only on the store).
 
-Example (SP-13, M6 registration gate):
+Example (a new record of the SP-13 session, written under its own name outside the repository):
 
     python tools/reconstruct_psv_registration.py --store snadwich \
         --svd "SP-13/SP13_a_500by500_Glue420_Auxetic_newSP01_260910.svd" \
         --unv "SP-13/SP13_a_polymax.unv" --width-mm 510 --height-mm 520 \
         --dimension-source "SP-13/spec.txt (510x520x2.85; 100 cm steel ruler + two calipers; no instrument uncertainty recorded)" \
-        --out docs/auto_id/registration_evidence/SP13_physical_registration_reconstruction.json
+        --out "<work folder>/SP13_260910_reconstruction_v2_DIAGNOSTIC.json"
 
 No modal data and no MAC are read. Store roots come from AUTO_ID_FIXTURE_ROOT_<STORE> variables.
+
+Nothing is overwritten (PSV-SCAN-OBJECT-MARGIN-01). If ``--out`` exists, the tool refuses before it reads
+anything, and the file is created exclusively; there is no option to replace a record. An accepted record, such
+as ``docs/auto_id/registration_evidence/SP13_physical_registration_reconstruction.json``, is therefore never an
+output of this tool: give a new record a new name.
 
 Pixel normalisation. A new reconstruction reads the frame of the scan points from the stored instrument
 metadata (``--normalisation instrument-metadata``, the default) and writes a v2 record. If the metadata do
 not decide, the tool refuses and writes nothing; it never falls back to the earlier reading. The earlier
 reading (``--normalisation legacy-default-rectangle``) exists only to reproduce a stored v1 record and
-must be named explicitly. The example above is a v1 record: to reproduce it, add
-``--normalisation legacy-default-rectangle``.
+must be named explicitly; the reproduction is written under a new name and compared with the stored record.
 """
 
 from __future__ import annotations
@@ -110,13 +114,19 @@ def main(argv: list[str] | None = None) -> None:
                              "when they do not decide. The legacy reading only reproduces a stored v1 record")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.out.exists() or args.out.is_symlink():  # before anything is read: an existing record is never replaced
+        raise SystemExit(f"REFUSED: {args.out} exists; an existing record is never overwritten (choose a new name)")
     try:
         record = build(args.store, args.svd, args.unv, args.width_mm, args.height_mm, args.dimension_source,
                        args.dimension_uncertainty, normalisation=args.normalisation)
     except PSVRegistrationError as exc:  # a refusal is the result: no record, no other reading is tried
         raise SystemExit(f"REFUSED ({args.normalisation}): {exc}") from exc
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+    try:
+        with open(args.out, "x", encoding="utf-8", newline="\n") as stream:  # exclusive: a file made meanwhile is kept
+            stream.write(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    except FileExistsError:
+        raise SystemExit(f"REFUSED: {args.out} exists; an existing record is never overwritten") from None
     print(f"wrote {args.out}")
 
 
