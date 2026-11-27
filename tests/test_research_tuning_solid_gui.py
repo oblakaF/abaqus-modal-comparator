@@ -94,6 +94,41 @@ class SolidPage(unittest.TestCase):
         return dict(map(tuple, panel.table_cells(key)))
 
     @WINDOWS_ONLY
+    def test_the_solid_mode_fits_a_narrow_window_with_every_control_in_view(self):
+        """RESEARCH-TUNING-RESPONSIVE-FIX-01: the solid card's button row wraps; the page does not scroll sideways."""
+        from PySide6.QtCore import QPoint, Qt
+
+        panel = self.panel()
+        panel.choose_file("inp", str(self.inp))
+        self.wait(panel)
+        self.assertTrue(panel.solid_card.isVisible())
+        window = panel.window()
+        for progress in (False, True):
+            panel.solid_progress.setVisible(progress)  # as while a calculation runs (layout only; nothing is started)
+            for size in ((900, 680), (1366, 768)):
+                window.resize(*size)
+                self.app.processEvents()
+                self.app.processEvents()
+                area = window.stack.currentWidget()
+                view = area.viewport()
+                name = (size, progress)
+                self.assertEqual(area.horizontalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAsNeeded, name)
+                self.assertEqual(area.horizontalScrollBar().maximum(), 0, name)
+                shown = [panel.solid_run_button, panel.solid_cancel_button] + ([panel.solid_progress] if progress else [])
+                for control in shown:
+                    self.assertTrue(control.isVisibleTo(window), name)
+                    left = control.mapTo(view, QPoint(0, 0)).x()
+                    self.assertGreaterEqual(left, 0, name)
+                    self.assertLessEqual(left + control.width(), view.width(), name)
+                for button in shown[:2]:
+                    self.assertGreaterEqual(button.width(), button.sizeHint().width(), (name, button.text()))
+                    self.assertGreaterEqual(button.height(), 36, (name, button.text()))
+                if progress:
+                    self.assertGreaterEqual(panel.solid_progress.width(), 40, name)
+                    self.assertEqual(panel.solid_progress.height(), 10, name)
+        panel.solid_progress.setVisible(False)
+
+    @WINDOWS_ONLY
     def test_a_solid_inp_opens_the_separate_solid_mode_with_identity_and_unchanged_values(self):
         panel = self.panel()
         panel.choose_file("inp", str(self.inp))

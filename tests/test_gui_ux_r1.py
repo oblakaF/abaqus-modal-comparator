@@ -609,6 +609,57 @@ class NavigationTests(_Flow):
                 self.assertIsInstance(area, QScrollArea)
                 self.assertEqual(area.horizontalScrollBar().maximum(), 0, (size, page))
 
+    def test_the_tuning_page_rows_continue_on_the_next_line_instead_of_widening_the_page(self):
+        """RESEARCH-TUNING-RESPONSIVE-FIX-01: a row of wide buttons wraps; no button is cut, hidden or pushed out of view."""
+        window = self.window()
+        window.show()
+        tuning = window.research_tuning
+        tuning.results_card.setVisible(True)  # the cards a result or a solid model shows: their rows, layout only
+        tuning.solid_card.setVisible(True)
+        rows = ((tuning.sandwich_read_button, tuning.sandwich_folder_button),
+                (tuning.export_button, tuning.abaqus_button),
+                (tuning.solid_run_button, tuning.solid_cancel_button),
+                (tuning.run_button, tuning.cancel_button), (tuning.use_registered_button,))
+        for size in ((900, 680), (1366, 768)):
+            window.resize(*size)
+            window.show_page(pw.TUNING_PAGE)
+            self.app.processEvents()
+            self.app.processEvents()
+            area = window.stack.currentWidget()
+            self.assertEqual(area.horizontalScrollBarPolicy(), Qt.ScrollBarPolicy.ScrollBarAsNeeded, size)  # not masked
+            self.assertEqual(area.horizontalScrollBar().maximum(), 0, size)
+            self.assertFalse(area.horizontalScrollBar().isVisible(), size)
+            view = area.viewport()
+            for row in rows:
+                for button in row:
+                    name = (size, button.text())
+                    self.assertTrue(button.isVisibleTo(window), name)
+                    self.assertGreaterEqual(button.width(), button.sizeHint().width(), name)  # its whole text
+                    self.assertGreaterEqual(button.height(), button.sizeHint().height(), name)
+                    left = button.mapTo(view, QPoint(0, 0)).x()
+                    self.assertGreaterEqual(left, 0, name)
+                    self.assertLessEqual(left + button.width(), view.width(), name)
+                if len(row) == 2:  # side by side whenever both fit; otherwise the second directly below, left-aligned
+                    first, second = row
+                    room = first.parentWidget().contentsRect().width() - 32  # the card's own margins
+                    fits = first.sizeHint().width() + 6 + second.sizeHint().width() <= room
+                    one_line = abs(first.geometry().center().y() - second.geometry().center().y()) <= 2
+                    self.assertEqual(one_line, fits, (size, first.text(), room))
+                    if not one_line:
+                        self.assertEqual(second.x(), first.x(), (size, second.text()))
+                        self.assertGreaterEqual(second.y(), first.y() + first.height(), (size, second.text()))
+        # at the wide size every two-button row is on one line, as before
+        for first, second in (r for r in rows if len(r) == 2):
+            self.assertLess(first.x(), second.x(), first.text())
+            self.assertLessEqual(abs(first.geometry().center().y() - second.geometry().center().y()), 2, first.text())
+        # and the narrow size did wrap at least the widest row, so the test is not empty
+        window.resize(900, 680)
+        self.app.processEvents()
+        self.app.processEvents()
+        wide = tuning.export_button.sizeHint().width() + 6 + tuning.abaqus_button.sizeHint().width()
+        if wide > tuning.export_button.parentWidget().contentsRect().width() - 32:
+            self.assertGreater(tuning.abaqus_button.y(), tuning.export_button.y())
+
     def test_save_from_the_menu_stays_on_the_page(self):
         window, panel = self.analysed()
         panel.save_project_as(str(self.project))

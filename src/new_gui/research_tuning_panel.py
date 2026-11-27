@@ -12,11 +12,11 @@ import threading
 import time
 from typing import Callable, Optional
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QGuiApplication, QPixmap
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFrame,
-                               QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QProgressBar,
-                               QPushButton, QSizePolicy, QVBoxLayout, QWidget)
+                               QGridLayout, QHBoxLayout, QLabel, QLayout, QLineEdit, QMessageBox, QPlainTextEdit,
+                               QProgressBar, QPushButton, QSizePolicy, QVBoxLayout, QWidget)
 
 from new_gui import analyze_model as am
 from new_gui import research_tuning_model as rm
@@ -134,6 +134,92 @@ class _Choice(QWidget):
 
     def set_value(self, key: str) -> None:
         self.buttons[self._keys.index(key)].setChecked(True)
+
+
+class _WrapRow(QLayout):
+    """A row of controls, left to right, that continues on the next line when the page is narrower than the row.
+
+    A plain horizontal row cannot be narrower than the sum of its controls, and then the whole page scrolls sideways.
+    Here the row needs only the width of its widest control; every control keeps its own size and stays in view.
+    ``addFilling`` adds a last control that takes the rest of its line (a progress bar).
+    """
+
+    def __init__(self, spacing: int = 6):
+        super().__init__()
+        self._items: list = []
+        self._filling: set = set()
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setSpacing(spacing)
+
+    def addItem(self, item) -> None:
+        self._items.append(item)
+
+    def addFilling(self, widget: QWidget) -> None:
+        self.addWidget(widget)
+        self._filling.add(widget)
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, index: int):
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index: int):
+        return self._items.pop(index) if 0 <= index < len(self._items) else None
+
+    def expandingDirections(self):
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self._place(QRect(0, 0, width, 0), False)
+
+    def setGeometry(self, rect) -> None:
+        super().setGeometry(rect)
+        self._place(rect, True)
+
+    def _shown(self) -> list:
+        return [item for item in self._items if not item.isEmpty()]  # a hidden control takes no place
+
+    def sizeHint(self) -> QSize:
+        items = self._shown()
+        width = sum(i.sizeHint().width() for i in items) + self.spacing() * max(0, len(items) - 1)
+        return QSize(width, max([i.sizeHint().height() for i in items] or [0]))
+
+    def minimumSize(self) -> QSize:
+        items = self._shown()
+        return QSize(max([i.minimumSize().width() for i in items] or [0]),
+                     max([i.sizeHint().height() for i in items] or [0]))
+
+    def lines(self, width: int) -> list:
+        """The shown controls as lines of (item, width, height) for a row ``width`` wide."""
+        lines, current, x = [], [], 0
+        for item in self._shown():
+            size = item.sizeHint()
+            wide = min(size.width(), max(width, item.minimumSize().width()))
+            if current and x + wide > width:
+                lines.append(current)
+                current, x = [], 0
+            current.append((item, wide, size.height()))
+            x += wide + self.spacing()
+        return lines + ([current] if current else [])
+
+    def _place(self, rect, move: bool) -> int:
+        """Lay the shown controls out in ``rect``; returns the height used."""
+        y = rect.y()
+        for line in self.lines(rect.width()):
+            height, x = max(h for _item, _wide, h in line), rect.x()
+            for item, wide, h in line:
+                if item is line[-1][0] and item.widget() in self._filling:
+                    wide = max(wide, rect.x() + rect.width() - x)
+                if move:
+                    item.setGeometry(QRect(x, y + (height - h) // 2, wide, h))
+                x += wide + self.spacing()
+            y += height + self.spacing()
+        return max(0, y - self.spacing() - rect.y())
+
 
 
 def _card():
@@ -282,7 +368,7 @@ class ResearchTuningPanel(QWidget):
             self.solid_boxes[key] = box
         self.solid_resources = _label("", "hint")
         inner.addWidget(self.solid_resources)
-        row = QHBoxLayout()
+        row = _WrapRow()  # two wide buttons and the progress bar
         self.solid_run_button = QPushButton("Calculate frequencies (one FE solve)...")
         self.solid_run_button.setObjectName("primary")
         self.solid_run_button.setMinimumHeight(36)
@@ -297,7 +383,7 @@ class ResearchTuningPanel(QWidget):
         self.solid_progress.setTextVisible(False)
         self.solid_progress.setFixedHeight(10)
         self.solid_progress.setVisible(False)
-        row.addWidget(self.solid_progress, 1)
+        row.addFilling(self.solid_progress)
         inner.addLayout(row)
         self.solid_state = _label("")
         inner.addWidget(self.solid_state)
@@ -382,7 +468,7 @@ class ResearchTuningPanel(QWidget):
         inner.addWidget(self.sandwich_badge)
         inner.addWidget(_label(rm.SANDWICH_INTRO, "hint"))
         inner.addWidget(_label(rm.SANDWICH_STEPS, "hint"))
-        row = QHBoxLayout()
+        row = _WrapRow()  # two wide buttons: the second goes below the first on a narrow page
         self.sandwich_read_button = QPushButton(rm.SANDWICH_READ)
         self.sandwich_read_button.setObjectName("sandwichRead")
         self.sandwich_read_button.setMinimumHeight(32)
@@ -394,7 +480,6 @@ class ResearchTuningPanel(QWidget):
         self.sandwich_folder_button.clicked.connect(lambda: self.choose_sandwich_archive())
         row.addWidget(self.sandwich_read_button)
         row.addWidget(self.sandwich_folder_button)
-        row.addStretch(1)
         inner.addLayout(row)
         self.sandwich_state = _label("Choose the SP-13 .inp and .unv in section 1, then read the sources.")
         self.sandwich_state.setObjectName("sandwichState")
@@ -635,7 +720,7 @@ class ResearchTuningPanel(QWidget):
         self.influence_note = _label("", "hint")
         self.influence_note.setVisible(False)
         self.stability_boxes["stability_influence"][1].addWidget(self.influence_note)
-        row = QHBoxLayout()
+        row = _WrapRow()  # three wide buttons
         self.export_button = QPushButton("Export proposal (JSON)...")
         self.export_button.setObjectName("tuningExport")
         self.export_button.clicked.connect(lambda: self.export())
@@ -648,7 +733,6 @@ class ResearchTuningPanel(QWidget):
         self.abaqus_button.setObjectName("tuningExportAbaqus")
         self.abaqus_button.clicked.connect(lambda: self.export_abaqus())
         row.addWidget(self.abaqus_button)
-        row.addStretch(1)
         inner.addLayout(row)
         self.abaqus_note = _label("", "hint")
         self.abaqus_note.setObjectName("tuningExportAbaqusNote")
