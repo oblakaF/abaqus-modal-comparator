@@ -27,6 +27,7 @@ from services import research_frequency_stability as rfs
 from services import research_frequency_tuning as rft
 from services import sandwich_trial_candidates as stc
 from services import solid_forward_runner as sfr
+from services import standalone_plate_estimation as spe
 
 QUIET_JOBS = (None, "check", "solid_check")  # jobs that never hold the file choice
 
@@ -134,6 +135,14 @@ class _Choice(QWidget):
 
     def set_value(self, key: str) -> None:
         self.buttons[self._keys.index(key)].setChecked(True)
+
+    def clear(self) -> None:
+        """Nothing chosen again (a choice that the route in use does not offer is not kept as a statement)."""
+        self._group.setExclusive(False)
+        for button in self.buttons:
+            button.setChecked(False)
+        self._group.setExclusive(True)
+        self.changed.emit()
 
 
 class _WrapRow(QLayout):
@@ -249,6 +258,10 @@ class ResearchTuningPanel(QWidget):
         self._registered_source = registered_source
         self.registered: Optional[rre.RegisteredSet] = None  # ABM-AUD-5: the registered set in use
         self.registered_data: Optional[dict] = None  # what Analyze gave for it (its inputs are checked before a fit)
+        # PLATE-DIRECT-ESTIMATION-01: True while ``registered`` holds a standalone plate's modal set (no FE model, no
+        # registration, no shape review); the same form and result area serve it, with the FE-only parts hidden
+        self.standalone = False
+        self.plate_path = ""
         self.review: Optional[dict] = None  # the shape review of the entered plate, when it is current
         self.review_table: Optional[dict] = None
         self.block: Optional[dict] = None  # the registered-estimation part of the shown result
@@ -294,6 +307,7 @@ class ResearchTuningPanel(QWidget):
         layout.addWidget(_label(INTRO, "hint"))
         layout.addWidget(self._build_files())
         layout.addWidget(self._build_registered())
+        layout.addWidget(self._build_standalone())
         layout.addWidget(self._build_solid())
         layout.addWidget(self._build_sandwich())
         layout.addWidget(self._build_setup())
@@ -763,8 +777,37 @@ class ResearchTuningPanel(QWidget):
         inner.addLayout(self.registered_identity_box)
         self.registered_form = QFrame()  # filled by _build_registered_form when a registered set is first taken
         self.reg_fields, self.reg_categories, self.reg_axes, self.review_boxes = {}, {}, {}, {}
+        self._fe_only: list = []  # the form's widgets that speak of the FE frame, the shape review or a material axis
+        self.registered_form_box = inner
         inner.addWidget(self.registered_form)
         self.registered_form.setVisible(False)
+        return card
+
+    def _build_standalone(self) -> QFrame:
+        """PLATE-DIRECT-ESTIMATION-01: the standalone plate route: one modal file and an entered plate, no FE model."""
+        card, inner = _card()
+        inner.addWidget(_label(rm.STANDALONE_TITLE, "sectionTitle"))
+        inner.addWidget(_label(rm.STANDALONE_INTRO, "hint"))
+        self.plate_field = QLineEdit()
+        self.plate_field.setObjectName("tuningPlateFile")
+        self.plate_field.setAccessibleName("Standalone plate: modal file")
+        self.plate_field.setReadOnly(True)
+        self.plate_field.setPlaceholderText("not chosen")
+        self.plate_field.setMinimumWidth(80)
+        inner.addWidget(self.plate_field)
+        row = QHBoxLayout()
+        self.plate_button = QPushButton(rm.STANDALONE_CHOOSE)
+        self.plate_button.setObjectName("tuningChoosePlateFile")
+        self.plate_button.clicked.connect(lambda: self.choose_plate_file())
+        row.addWidget(self.plate_button)
+        row.addStretch(1)
+        inner.addLayout(row)
+        self.standalone_state = _label(rm.STANDALONE_NONE, "hint")
+        self.standalone_state.setObjectName("tuningStandaloneState")
+        inner.addWidget(self.standalone_state)
+        self.standalone_identity_box = QVBoxLayout()
+        inner.addLayout(self.standalone_identity_box)
+        self.standalone_form_box = inner  # the plate form is moved here while the standalone route is in use
         return card
 
     def _build_registered_form(self) -> None:
@@ -776,7 +819,8 @@ class ResearchTuningPanel(QWidget):
         form.setContentsMargins(0, 0, 0, 0)
         form.setSpacing(8)
         form.addWidget(_label("Measured and fixed inputs (nothing is taken from a file unless you ask for it)", "sectionTitle"))
-        form.addWidget(_label(rm.CATEGORY_NOTE, "hint"))
+        self.category_note = _label(rm.CATEGORY_NOTE, "hint")
+        form.addWidget(self.category_note)
         grid = QGridLayout()
         grid.setColumnMinimumWidth(0, 130)  # the captions wrap and never ask for a width of their own
         grid.setColumnStretch(3, 1)
@@ -797,6 +841,8 @@ class ResearchTuningPanel(QWidget):
         self._line(form, "source", "Source of these values (for example the measurement sheet)")
         form.addWidget(_label(rm.RANGES_TITLE, "sectionTitle"))
         form.addWidget(_label(rm.RANGES_NOTE, "hint"))
+        self.standalone_ranges_note = _label(rm.STANDALONE_RANGES_NOTE, "hint")
+        form.addWidget(self.standalone_ranges_note)
         ranges = QGridLayout()
         ranges.setColumnMinimumWidth(0, 130)
         ranges.setColumnStretch(3, 1)
@@ -820,39 +866,46 @@ class ResearchTuningPanel(QWidget):
         self.ranges_check.setVisible(False)
         form.addWidget(self.ranges_check)
         self._line(form, "suspension", "Support note, optional (the model is free on all edges)")
-        form.addWidget(_label("Position in the registered FE frame", "sectionTitle"))
+        def fe_only(widget):
+            self._fe_only.append(widget)
+            return widget
+
+        form.addWidget(fe_only(_label("Position in the registered FE frame", "sectionTitle")))
         axes = QGridLayout()
         axes.setColumnMinimumWidth(0, 200)
         axes.setColumnStretch(2, 1)
         for line, (key, caption) in enumerate((("length_axis", "Length a runs along FE axis"),
                                                ("width_axis", "Width b runs along FE axis"))):
-            axes.addWidget(_label(caption), line, 0)
+            axes.addWidget(fe_only(_label(caption)), line, 0)
             choice = _Choice(f"reg_{key}", rm.AXIS_CHOICES, caption)
             choice.changed.connect(self._registered_changed)
-            axes.addWidget(choice, line, 1)
+            axes.addWidget(fe_only(choice), line, 1)
             self.reg_axes[key] = choice
         form.addLayout(axes)
         row = QHBoxLayout()
         self.take_fe_button = QPushButton("Take length and width from the FE model")
         self.take_fe_button.setObjectName("regTakeFe")
         self.take_fe_button.clicked.connect(lambda: self.take_fe_dimensions())
-        row.addWidget(self.take_fe_button)
+        row.addWidget(fe_only(self.take_fe_button))
         row.addStretch(1)
         form.addLayout(row)
         self.reg_linked = QCheckBox(rm.LINK_CHECK)  # a short caption: a check box does not wrap its text
         self.reg_linked.setObjectName("regLinked")
         self.reg_linked.toggled.connect(lambda _on: self._registered_changed())
-        form.addWidget(self.reg_linked)
-        form.addWidget(_label(rm.LINK_TEXT, "hint"))
-        form.addWidget(_label("Material axis 1 (needed only to name E1 and E2)", "sectionTitle"))
+        form.addWidget(fe_only(self.reg_linked))
+        form.addWidget(fe_only(_label(rm.LINK_TEXT, "hint")))
+        form.addWidget(fe_only(_label("Material axis 1 (needed only to name E1 and E2)", "sectionTitle")))
         self.reg_material_axis = _Choice("regMaterialAxis", rm.MATERIAL_AXIS_CHOICES, "Material axis 1", checked="")
         self.reg_material_axis.changed.connect(self._registered_changed)
-        form.addWidget(self.reg_material_axis)
-        self._line(form, "axis_evidence", "Evidence of that direction (for example the layup record)")
-        form.addWidget(_label(rm.REFERENCE_NOTE, "hint"))
+        form.addWidget(fe_only(self.reg_material_axis))
+        self._line(form, "axis_evidence", "Evidence of that direction (for example the layup record)", fe_only)
+        self.reference_note = _label(rm.REFERENCE_NOTE, "hint")
+        form.addWidget(self.reference_note)
         reference = QGridLayout()
+        self.reference_captions = {}
         for column, key in enumerate(("E1", "E2", "G12")):
-            reference.addWidget(_label(f"Reference {key} (MPa)"), 0, 2 * column)
+            self.reference_captions[key] = _label(f"Reference {key} (MPa)")
+            reference.addWidget(self.reference_captions[key], 0, 2 * column)
             field = QLineEdit()
             field.setObjectName(f"reg_{key}")
             field.setAccessibleName(f"Reference {key} (MPa)")
@@ -870,7 +923,7 @@ class ResearchTuningPanel(QWidget):
         self.review_button.setObjectName("regReview")
         self.review_button.setMinimumHeight(32)
         self.review_button.clicked.connect(lambda: self.review_shapes())
-        row.addWidget(self.review_button)
+        row.addWidget(fe_only(self.review_button))
         row.addStretch(1)
         form.addLayout(row)
         self.review_note = _label(rm.RANK_ONLY_NOTE, "hint")
@@ -896,15 +949,46 @@ class ResearchTuningPanel(QWidget):
         form.addWidget(self.reg_fixed)
         form.addWidget(_label(rm.FIX_TEXT, "hint"))
 
-    def _line(self, layout, key: str, caption: str) -> None:
-        layout.addWidget(_label(caption))
+    def _line(self, layout, key: str, caption: str, mark=lambda widget: widget) -> None:
+        layout.addWidget(mark(_label(caption)))
         field = QLineEdit()
         field.setObjectName(f"reg_{key}")
         field.setAccessibleName(caption)
         field.setMinimumWidth(80)
         field.textChanged.connect(lambda _t: self._registered_changed())
-        layout.addWidget(field)
+        layout.addWidget(mark(field))
         self.reg_fields[key] = field
+
+    def _apply_form_mode(self) -> None:
+        """PLATE-DIRECT-ESTIMATION-01: the one plate form in the card of the route in use. For a standalone plate the
+        parts that speak of the FE frame, the shape review and a material axis are hidden, a value cannot be marked
+        'From FE', and the reference constants are optional and named by the plate edges."""
+        self._build_registered_form()
+        standalone = self.standalone
+        target = self.standalone_form_box if standalone else self.registered_form_box
+        if target.indexOf(self.registered_form) < 0:
+            shown = not self.registered_form.isHidden()
+            (self.registered_form_box if standalone else self.standalone_form_box).removeWidget(self.registered_form)
+            target.addWidget(self.registered_form)
+            self.registered_form.setVisible(shown)
+        for widget in self._fe_only:
+            widget.setVisible(not standalone)
+        for choice in self.reg_categories.values():
+            choice.buttons[-1].setVisible(not standalone)  # "From FE"
+            if standalone and choice.value() == rre.IMPORTED_FE:
+                choice.clear()
+        self.standalone_ranges_note.setVisible(standalone)
+        self.category_note.setText(rm.STANDALONE_CATEGORY_NOTE if standalone else rm.CATEGORY_NOTE)
+        self.reference_note.setText(rm.STANDALONE_REFERENCE_NOTE if standalone else rm.REFERENCE_NOTE)
+        for key, caption in self.reference_captions.items():
+            name = {"E1": "Ex", "E2": "Ey", "G12": "Gxy"}[key] if standalone else key
+            caption.setText(f"Reference {name} (MPa)")
+            self.reg_fields[key].setPlaceholderText("optional" if standalone else "")
+        if standalone:  # statements of the registered route are not carried into a standalone plate
+            self.reg_linked.setChecked(False)
+            self.reg_material_axis.set_value("")
+            self.reg_fields["axis_evidence"].setText("")
+        self.review_note.setText(rm.STANDALONE_RANK_NOTE if standalone else rm.RANK_ONLY_NOTE)
 
     def _build_registered_results(self) -> QFrame:
         """The registered route's own statements, above the common tables; hidden for an INP result."""
@@ -916,17 +1000,27 @@ class ResearchTuningPanel(QWidget):
         self.presentation.setObjectName("tuningPresentation")
         inner.addWidget(self.presentation)
         self.registered_result_boxes = {}
+        self._registered_titles, self._standalone_titles = [], []  # shown for one route only
         for key, title in (("reg_summary", "Research summary (the details are in the tables below)"),
                            ("reg_statements", "Seven separate statements (none implies another)"),
                            ("reg_stiffness", "Bending stiffness of the plate (in its edge axes)"),
                            ("reg_constants", "Engineering constants, conditional"),
+                           ("plate_minima", "Minima reached from the starts: competing hypotheses, none is chosen"),
+                           ("plate_identities", "Mode identities and ambiguity: every identity is unresolved"),
                            ("reg_unc_inputs", "Input uncertainty: what was stated"),
                            ("reg_unc_sensitivity", "Local sensitivity of the estimates to each input"),
                            ("reg_unc_ranges", "Estimates at the ends of the stated ranges (one input at a time)")):
-            inner.addWidget(_label(title, "sectionTitle"))
+            caption = _label(title, "sectionTitle")
+            inner.addWidget(caption)
+            if key.startswith("plate_"):
+                self._standalone_titles.append(caption)
             box = QVBoxLayout()
             inner.addLayout(box)
             self.registered_result_boxes[key] = box
+        self.identity_statement = _label("", "warnings")
+        self.identity_statement.setObjectName("tuningIdentityStatement")
+        self.registered_result_boxes["plate_identities"].addWidget(self.identity_statement)
+        self._standalone_titles.append(self.identity_statement)
         self.uncertainty_note = _label(rm.UNCERTAINTY_NONE, "warnings")
         self.uncertainty_note.setObjectName("tuningUncertaintyNote")
         self.registered_result_boxes["reg_unc_inputs"].addWidget(_label(rm.UNCERTAINTY_NOTE, "hint"))
@@ -949,13 +1043,16 @@ class ResearchTuningPanel(QWidget):
                            ("reg_fitted_groups", "Close Ritz modes at the fitted values"),
                            ("reg_reference", "The fixed correspondence against the reviewed shapes (reference constants)"),
                            ("reg_result_frame", "How the Ritz rectangle was tied to the registered frame")):
-            inner.addWidget(_label(title, "sectionTitle"))
+            caption = _label(title, "sectionTitle")
+            inner.addWidget(caption)
+            self._registered_titles.append(caption)
             box = QVBoxLayout()
             inner.addLayout(box)
             self.registered_result_boxes[key] = box
         self.branch_statement = _label("", "hint")
         self.branch_statement.setObjectName("tuningBranchStatement")
         self.registered_result_boxes["reg_branch"].addWidget(self.branch_statement)
+        self._registered_titles.append(self.branch_statement)
         frame.setVisible(False)
         return frame
 
@@ -965,7 +1062,7 @@ class ResearchTuningPanel(QWidget):
         categories = {key: choice.value() for key, choice in self.reg_categories.items()}
         choices = {"length_axis": self.reg_axes["length_axis"].value(), "width_axis": self.reg_axes["width_axis"].value(),
                    "linked": self.reg_linked.isChecked(), "material_axis": self.reg_material_axis.value()}
-        return rm.parse_plate(texts, categories, choices)
+        return rm.parse_plate(texts, categories, choices, self.standalone)
 
     def set_ranges(self, **values) -> None:
         """Fill range fields (tests and checks): ``low_length=...``, ``high_length=...`` and so on; "" clears one."""
@@ -1017,7 +1114,9 @@ class ResearchTuningPanel(QWidget):
         self._clear_solid()
         self._table("inputs", None, (), (), 0)
         self._say("")
-        self._build_registered_form()
+        if self.standalone:  # one source at a time: the standalone plate's file is released
+            self._leave_standalone(rm.STANDALONE_NONE)
+        self._apply_form_mode()
         self.registered, self.registered_data = rset, source
         self._drop_review()
         self.sources = rm.Sources(None, None, (), (), "", str(rset.source.get("experimental_file", "")),
@@ -1034,13 +1133,73 @@ class ResearchTuningPanel(QWidget):
         self._refresh()
         return True
 
+    def _leave_standalone(self, text: str) -> None:
+        self.standalone, self.plate_path = False, ""
+        self.plate_field.setText("")
+        self.plate_field.setToolTip("")
+        self._table("standalone_identity", None, (), (), 0)
+        self.standalone_state.setText(text)
+
+    def choose_plate_file(self, path: Optional[str] = None) -> bool:
+        """PLATE-DIRECT-ESTIMATION-01: choose the modal file of a standalone plate and read its curve-fitted records in
+        the background. Nothing else is needed: no INP, no ODB, no comparison on Analyze."""
+        if self._active not in QUIET_JOBS:
+            return False
+        path = path if path is not None else self._ask_path("unv", str(Path(self.plate_path).parent) if self.plate_path else "")
+        if not path:
+            return False
+        if self._active in ("check", "solid_check"):
+            self._token += 1
+            self._active, self._cancel = None, None
+        if self.registered is not None:
+            self.release_registered()
+        for kind in self.paths:  # one source at a time: the INP route's files are released
+            self.paths[kind] = ""
+            self.fields[kind].setText("")
+            self.fields[kind].setToolTip("")
+        self.sources = None
+        self._clear_result()
+        self._clear_compatibility()
+        self._clear_solid()
+        self._clear_sandwich()
+        self._table("inputs", None, (), (), 0)
+        self._say("")
+        self.plate_path = str(path)
+        self.plate_field.setText(str(path))
+        self.plate_field.setToolTip(str(path))
+        self.standalone_state.setText("Reading the curve-fitted records...")
+        self.state.setText("Reading the modal file...")
+        return self._start("plate_read", lambda cancel, _s: rm.read_standalone(path, cancel))
+
+    def _use_standalone(self, pset: spe.PlateModalSet) -> None:
+        """The records were read: the standalone plate route is in use, with the plate form in its card."""
+        self.standalone = True
+        self._apply_form_mode()
+        self.registered, self.registered_data = pset, None
+        self._drop_review()
+        self.sources = rm.Sources(None, None, (), (), "", str(pset.source.get("experimental_path", "")),
+                                  str(pset.source.get("experimental_sha256", "")), str(pset.source.get("modal_set_title", "")),
+                                  pset.records)
+        self._table("standalone_identity", self.standalone_identity_box, ("Standalone plate: modal set", "Value"),
+                    rm.standalone_identity_rows(pset), 1)
+        self.registered_form.setVisible(True)
+        self.registered_state.setText(rm.REGISTERED_NONE)
+        self.standalone_state.setText(f"Standalone plate in use: {len(pset.records)} curve-fitted records of "
+                                      f"{pset.source.get('modal_set_title', '')}. Frequencies only; no mode shape is compared.")
+        self._show_records()
+        self._registered_changed()
+        self.state.setText("Modal file read. Enter the plate, set the roles and fix the correspondence hypothesis.")
+
     def release_registered(self, text: str = "") -> None:
-        """Forget the registered set, its review and its live result."""
+        """Forget the registered set (or the standalone plate's modal set), its review and its live result."""
         had = self.registered is not None
         self.registered, self.registered_data = None, None
         self._drop_review()
         self._table("registered_identity", None, (), (), 0)
         self.registered_form.setVisible(False)
+        if self.standalone:
+            self._leave_standalone(text or rm.STANDALONE_NONE)
+            text = ""
         self.registered_state.setText(text or rm.REGISTERED_NONE)
         if had:
             self.sources = None
@@ -1051,12 +1210,13 @@ class ResearchTuningPanel(QWidget):
                 old.setParent(None)
                 old.deleteLater()
             self.role_combos, self.rank_items = {}, {}
-            self.state.setText("Choose the two files, or take the comparison from Analyze.")
+            self.state.setText("Choose the two files, take the comparison from Analyze, or choose a standalone plate's "
+                               "modal file.")
         self._refresh()
 
     def analysis_changed(self) -> None:
         """The Analyze page changed. A registered set stays only while it is that page's current comparison."""
-        if self.registered is None or self._registered_source is None:
+        if self.registered is None or self._registered_source is None or self.standalone:
             return
         try:
             now = self._registered_source()
@@ -1073,7 +1233,7 @@ class ResearchTuningPanel(QWidget):
 
     def take_fe_dimensions(self) -> bool:
         """An explicit import: the FE extents along the two chosen axes become the length and width, marked as such."""
-        if self.registered is None:
+        if self.registered is None or self.standalone:
             return False
         length = rm.fe_extent_mm(self.registered, self.reg_axes["length_axis"].value())
         width = rm.fe_extent_mm(self.registered, self.reg_axes["width_axis"].value())
@@ -1108,7 +1268,7 @@ class ResearchTuningPanel(QWidget):
             caption.setVisible(False)
         if self.reg_fields:
             self.review_summary.setVisible(False)
-            self.review_note.setText(rm.RANK_ONLY_NOTE)
+            self.review_note.setText(rm.STANDALONE_RANK_NOTE if self.standalone else rm.RANK_ONLY_NOTE)
         self._unfix()
 
     def _stale_registered_result(self) -> None:
@@ -1132,8 +1292,8 @@ class ResearchTuningPanel(QWidget):
 
     def review_shapes(self) -> bool:
         """The MAC of every record against every Ritz rank at the reference constants, in the background."""
-        if self.registered is None or self._active is not None:
-            return False
+        if self.registered is None or self._active is not None or self.standalone:
+            return False  # a standalone plate has no point mapping: there is no shape to review
         plate, problems = self._plate()
         if problems:
             self._say("Not reviewed: " + " ".join(problems))
@@ -1203,8 +1363,16 @@ class ResearchTuningPanel(QWidget):
                 raise ValueError("The search range factor must exceed 1.")
             if not 4 <= request.degree <= 24:
                 raise ValueError("The Ritz basis degree must be between 4 and 24.")
-            review = self.review if rre.review_is_current(self.review, self.registered, plate, request.degree) else None
-            rre.tracked_request(self.registered, plate, request, review)  # every refusal, before anything starts
+            ranges = {}
+            if self.standalone:
+                review = None
+                ranges, range_problems = self._ranges()
+                if range_problems:
+                    raise ValueError("Ranges not usable: " + " ".join(range_problems))
+                spe.check_request(self.registered, plate, request)  # every refusal, before anything starts
+            else:
+                review = self.review if rre.review_is_current(self.review, self.registered, plate, request.degree) else None
+                rre.tracked_request(self.registered, plate, request, review)  # every refusal, before anything starts
             if len(request.fit_rows()) <= len(rft.PARAMETERIZATIONS[request.parameterization]):
                 raise ValueError(f"{len(request.fit_rows())} FIT frequencies cannot determine "
                                  f"{len(rft.PARAMETERIZATIONS[request.parameterization])} parameters; keep more in the fit.")
@@ -1216,7 +1384,8 @@ class ResearchTuningPanel(QWidget):
             self._say("Not started: the record -> Ritz rank correspondence is not fixed. Review it and tick the fixing "
                       "statement; a fit never starts on a correspondence nobody fixed.")
             return False
-        text = rm.confirmation_text(self.registered, plate, request, review is not None, self.review_table)
+        text = (rm.standalone_confirmation_text(self.registered, plate, request, ranges) if self.standalone else
+                rm.confirmation_text(self.registered, plate, request, review is not None, self.review_table))
         if not self._ask_confirm("Run one research fit", text):
             self._say("")
             self.state.setText("Not started: the calculation was not confirmed.")
@@ -1227,6 +1396,9 @@ class ResearchTuningPanel(QWidget):
         source, rset = self.registered_data, self.registered
         self._run_plate, self._run_review = plate, review
         self.state.setText("Checking the source files and fitting...")
+        if self.standalone:
+            return self._start("registered_fit", lambda cancel, solved: rm.run_standalone(rset, plate, request, ranges,
+                                                                                           cancel, solved))
         return self._start("registered_fit", lambda cancel, solved: rm.run_registered(source, rset, plate, request, review,
                                                                                        cancel, solved))
 
@@ -1235,7 +1407,17 @@ class ResearchTuningPanel(QWidget):
         self.block = block
         self.registered_results.setVisible(True)
         verdict = block["presentation"]["verdict"]
-        self.presentation.setText(rm.presentation_text(block) + " | " + rre.LABEL)
+        standalone = rm.is_standalone(block)
+        self.presentation.setText(rm.presentation_text(block) + " | " + (block["label"] if standalone else rre.LABEL))
+        for widget in self._registered_titles:
+            widget.setVisible(not standalone)
+        for widget in self._standalone_titles:
+            widget.setVisible(standalone)
+        self._table("plate_minima", self.registered_result_boxes["plate_minima"], rm.COMPETING_HEADERS,
+                    rm.competing_rows(block) if standalone else (), 0)
+        self._table("plate_identities", self.registered_result_boxes["plate_identities"], rm.IDENTITY_HEADERS,
+                    rm.identity_rows(block) if standalone else (), 7)
+        self.identity_statement.setText(rm.ambiguity_text(block) if standalone else "")
         self.presentation.setProperty("state", "chosen" if verdict == rre.SUPPORTED_ESTIMATE else "blocked")
         self.presentation.style().unpolish(self.presentation)
         self.presentation.style().polish(self.presentation)
@@ -1277,6 +1459,20 @@ class ResearchTuningPanel(QWidget):
         if self.uncertainty is not None and self.saved_path is None and self._active is None:
             self._show_uncertainty(None)
             self.state.setText("The ranges changed: the previous assessment was cleared. Assess again for these ranges.")
+        if (self.standalone and rm.is_standalone(self.block) and self.result is not None and self.saved_path is None
+                and self._active is None):
+            # the moduli over the stated thickness follow by exact scaling: shown for the range on the page, no refit
+            try:
+                span = None if problems else spe.thickness_range_of(self._run_plate, _ranges)
+            except rft.TuningRefused:
+                span = None
+            if span != self.block.get("thickness_range_mm"):
+                self.block["thickness_range_mm"] = span
+                spe.complete(self.block, self.result)
+                boxes = self.registered_result_boxes
+                self._table("reg_constants", boxes["reg_constants"], rm.CONSTANT_HEADERS, rm.constant_rows(self.block), 2)
+                self.constants_note.setText(rm.constants_note(self.block))
+                self._show_summary()
         self._refresh()
 
     def run_uncertainty(self) -> bool:
@@ -1293,6 +1489,9 @@ class ResearchTuningPanel(QWidget):
         source, rset, plate, review = self.registered_data, self.registered, self._run_plate, self._run_review
         request, result = self.request, self.result
         self.state.setText("Assessing the inputs: the same fit is repeated with one input changed at a time...")
+        if self.standalone:
+            return self._start("uncertainty", lambda cancel, solved: rm.run_standalone_uncertainty(
+                rset, plate, request, result, ranges, cancel, solved))
         return self._start("uncertainty", lambda cancel, solved: rm.run_uncertainty(source, rset, plate, request, review,
                                                                                    result, ranges, cancel, solved))
 
@@ -1308,7 +1507,9 @@ class ResearchTuningPanel(QWidget):
         else:
             for key in ("reg_unc_inputs", "reg_unc_sensitivity", "reg_unc_ranges"):
                 self._table(key, None, (), (), 0)
-        self.uncertainty_note.setText(rm.uncertainty_text(uncertainty))
+        competing = (uncertainty is None and rm.is_standalone(self.block)
+                     and self.block["presentation"]["verdict"] == spe.COMPETING)
+        self.uncertainty_note.setText(rm.STANDALONE_UNCERTAINTY_COMPETING if competing else rm.uncertainty_text(uncertainty))
         self._show_summary()
 
     def _show_summary(self) -> None:
@@ -1346,7 +1547,8 @@ class ResearchTuningPanel(QWidget):
         of the snapshot and says so; nothing is recalculated."""
         if self.block is None or self.result is None or self._active not in QUIET_JOBS:
             return False
-        path = path if path is not None else self._ask_save_summary("registered_ritz_summary.txt")
+        path = path if path is not None else self._ask_save_summary(
+            "standalone_plate_summary.txt" if rm.is_standalone(self.block) else "registered_ritz_summary.txt")
         if not path:
             return False
         try:
@@ -1570,7 +1772,8 @@ class ResearchTuningPanel(QWidget):
         self.saved_path = str(path)
         self._show_summary()  # with the stability part and the name of the saved file's snapshot
         self.saved_note.setText(rm.SAVED_NOTE.format(name=Path(path).name)
-                                + (rm.REGISTERED_SAVED_NOTE if block is not None else ""))
+                                + (rm.STANDALONE_SAVED_NOTE if rm.is_standalone(block) else
+                                   rm.REGISTERED_SAVED_NOTE if block is not None else ""))
         self.saved_note.setVisible(True)
         self.state.setText(f"Saved result opened: {Path(path).name}. No calculation was run.")
         self._refresh()
@@ -1627,6 +1830,15 @@ class ResearchTuningPanel(QWidget):
             return
         if kind == "sandwich_read":
             self._sandwich_done(value)
+            self._refresh()
+            return
+        if kind == "plate_read":  # PLATE-DIRECT-ESTIMATION-01
+            if isinstance(value, Exception):
+                self._leave_standalone(f"Not read: {value}")
+                self._say(f"The standalone plate's modal file was not read: {value}")
+                self.state.setText("Not completed.")
+            else:
+                self._use_standalone(value)
             self._refresh()
             return
         if isinstance(value, Exception):
@@ -2217,7 +2429,8 @@ class ResearchTuningPanel(QWidget):
             self._table(key, None, (), (), 0)
         self.block = None
         self.uncertainty = None
-        for key in ("reg_summary", "reg_unc_inputs", "reg_unc_sensitivity", "reg_unc_ranges"):
+        for key in ("reg_summary", "reg_unc_inputs", "reg_unc_sensitivity", "reg_unc_ranges", "plate_minima",
+                    "plate_identities"):
             self._table(key, None, (), (), 0)
         self.uncertainty_note.setText(rm.UNCERTAINTY_NONE)
         self.registered_results.setVisible(False)
@@ -2306,14 +2519,22 @@ class ResearchTuningPanel(QWidget):
                 self.release_registered(f"Released: a source file changed after the calculation. {changed}")
                 self._say("Not exported: a source file changed after the calculation; the result was cleared.")
                 return False
+        standalone = rm.is_standalone(self.block)
+        if standalone and self.registered is not None:
+            changed = rm.standalone_sources_changed(self.registered)
+            if changed:  # the result no longer belongs to the file on disk: it is not exported and not kept
+                self.release_registered(f"Released: {changed} after the calculation.")
+                self._say("Not exported: the experimental file changed after the calculation; the result was cleared.")
+                return False
         path = path if path is not None else self._ask_save(
+            "standalone_plate_estimate.json" if standalone else
             "registered_ritz_estimate.json" if self.block is not None else "research_tuning_proposal.json")
         if not path:
             return False
         if self.block is not None:
             block = self.block if self.uncertainty is None else dict(self.block, uncertainty=self.uncertainty)
             try:
-                rft.write_export(rre.export_document(self.result, block, self.stability), path)
+                rft.write_export((spe if standalone else rre).export_document(self.result, block, self.stability), path)
             except OSError as error:
                 self._say(f"Not exported: {error}")
                 return False
@@ -2374,9 +2595,10 @@ class ResearchTuningPanel(QWidget):
         self.summary_button.setEnabled(not running and self.block is not None and self.result is not None)
         self.summary_button.setVisible(self.block is not None)
         self.use_registered_button.setEnabled(not running)
+        self.plate_button.setEnabled(not running)
         self.registered_form.setEnabled(not running)
         if self.reg_fields:
-            self.review_button.setEnabled(not running and self.registered is not None)
+            self.review_button.setEnabled(not running and self.registered is not None and not self.standalone)
         self.run_button.setText("Run research fit..." if self.registered is not None else "Run tuning")
         live = self.result is not None and self.result.status != rft.CANCELLED and self.saved_path is None
         self.stability_button.setEnabled(not running and live)

@@ -385,9 +385,11 @@ class SeparationTests(unittest.TestCase):
                          "review_model.py": set(), "review_panel.py": set(),
                          "research_tuning_model.py": {"modal_data_viewer", "registered_ritz_estimation", "registered_ritz_uncertainty",
                                                       "research_frequency_tuning", "sandwich_trial_candidates",
-                                                      "solid_c3d8i_forward", "solid_c3d8i_model", "solid_forward_runner"},
+                                                      "solid_c3d8i_forward", "solid_c3d8i_model", "solid_forward_runner",
+                                                      "standalone_plate_estimation"},  # PLATE-DIRECT-ESTIMATION-01
                          "research_tuning_panel.py": {"registered_ritz_estimation", "research_frequency_stability", "research_frequency_tuning",
-                                                      "sandwich_trial_candidates", "solid_forward_runner"}}
+                                                      "sandwich_trial_candidates", "solid_forward_runner",
+                                                      "standalone_plate_estimation"}}
 
     def test_the_new_gui_imports_only_its_own_modules_and_the_read_only_services(self):
         files = sorted(NEW_GUI.glob("*.py"))

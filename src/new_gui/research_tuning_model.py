@@ -28,6 +28,7 @@ from services import registered_ritz_estimation as rre
 from services import registered_ritz_uncertainty as rru
 from services import research_frequency_tuning as rft
 from services import sandwich_trial_candidates as stc
+from services import standalone_plate_estimation as spe
 
 LABEL = rft.RESULT_LABEL
 SURROGATE_NOTE = ("Ritz values are frequencies of the Kirchhoff plate surrogate, not Abaqus FE results. A candidate is a "
@@ -157,6 +158,14 @@ def read_sources(inp_path, unv_path, cancel: threading.Event, odb_path=None) -> 
         except rft.TuningRefused:
             rows = ()
     elastic, classification = _classify(odb_path, cancel)
+    title, records, identity, _others = read_fitted_records(unv_path, cancel)
+    return Sources(inputs, str(dat) if rows else None, rows, elastic, classification, str(unv_path),
+                   str(identity.get("sha256", "")), title, records, report)
+
+
+def read_fitted_records(unv_path, cancel: threading.Event) -> tuple:
+    """(modal set title, ((record, Hz), ...), file identity, titles of the further fitted sets) of the first
+    curve-fitted modal set of an experimental file, by the program's own importer. FRF peak records are refused."""
     outcome = pm.run_read(EXPERIMENTAL, unv_path, 0, cancel)
     if outcome.cancelled:
         raise ReadFailed("Cancelled.")
@@ -167,9 +176,7 @@ def read_sources(inp_path, unv_path, cancel: threading.Event, odb_path=None) -> 
         raise ReadFailed("The experimental file holds no curve-fitted modal set; FRF peak records are never used as modes.")
     chosen = fitted[0]
     records = tuple((int(r.number), float(r.frequency_hz)) for r in chosen.records)
-    identity = outcome.identity or {}
-    return Sources(inputs, str(dat) if rows else None, rows, elastic, classification, str(unv_path),
-                   str(identity.get("sha256", "")), chosen.title, records, report)
+    return chosen.title, records, outcome.identity or {}, tuple(item.title for item in fitted[1:])
 
 
 def default_holdout(records) -> tuple:
@@ -664,6 +671,9 @@ PRESENTATION_TEXT = {
     rre.SUPPORTED_ESTIMATE: "NUMERICALLY SUPPORTED RESEARCH ESTIMATE — conditional on the declared inputs; not a material property.",
     rre.DIAGNOSTIC_ONLY: "DIAGNOSTIC ONLY — not a supported estimate.",
     rre.NO_ESTIMATE: "NO ESTIMATE — the optimizer status gives none.",
+    spe.FREQUENCY_ONLY: "FREQUENCY-ONLY DIAGNOSTIC HYPOTHESIS — not a verified estimate; no mode identity; not a material property.",
+    spe.COMPETING: ("COMPETING FREQUENCY-ONLY HYPOTHESES — several minima fit; every one is listed, none is chosen; not a "
+                    "verified estimate."),
 }
 REGISTERED_SAVED_NOTE = (" The registration, the comparison and the source files of this saved result were not revalidated: "
                          "nothing of it is carried into a new calculation.")
@@ -711,14 +721,27 @@ def _number(text: str, name: str, problems: list) -> float:
         return float("nan")
 
 
-def parse_plate(texts: dict, categories: dict, choices: dict) -> tuple:
+def parse_plate(texts: dict, categories: dict, choices: dict, standalone: bool = False) -> tuple:
     """(plate or None, problems). ``texts``: the entered fields; ``categories``: the category of each quantity ("" when
-    not stated); ``choices``: length_axis, width_axis, linked, material_axis. Nothing is completed or defaulted."""
+    not stated); ``choices``: length_axis, width_axis, linked, material_axis. Nothing is completed or defaulted.
+
+    ``standalone`` (PLATE-DIRECT-ESTIMATION-01): the plate of the standalone route. It has no FE position and names no
+    material axis; its three reference constants may all be left empty, and the comparison column then uses the
+    neutral reference of the tuning service (1000 MPa each), which is not a statement about the plate."""
     problems = []
     values = {key: _number(texts.get(key, ""), caption, problems) for key, caption in PLATE_FIELDS}
-    reference = tuple(_number(texts.get(key, ""), f"Reference {key}", problems) for key in ("E1", "E2", "G12"))
+    if standalone and not any(str(texts.get(key, "")).strip() for key in ("E1", "E2", "G12")):
+        reference = spe.NEUTRAL_REFERENCE
+    else:
+        reference = tuple(_number(texts.get(key, ""), f"Reference {key}", problems) for key in ("E1", "E2", "G12"))
     if problems:
         return None, problems
+    if standalone:
+        plate = rre.Plate(values["length"], values["width"], values["thickness"], values["mass"], values["nu12"],
+                          tuple(categories.get(name, "") for name in rre.INPUT_NAMES), str(texts.get("source", "")).strip(),
+                          suspension=str(texts.get("suspension", "")).strip(), reference=reference)
+        problems = spe.plate_problems(plate)
+        return (None if problems else plate), problems
     plate = rre.Plate(values["length"], values["width"], values["thickness"], values["mass"], values["nu12"],
                       tuple(categories.get(name, "") for name in rre.INPUT_NAMES), str(texts.get("source", "")).strip(),
                       choices.get("length_axis", ""), choices.get("width_axis", ""), bool(choices.get("linked")),
@@ -808,7 +831,9 @@ def stiffness_rows(block: dict) -> tuple:
     s, verdict = block["stiffness"], block["presentation"]["verdict"]
     if verdict == rre.NO_ESTIMATE:
         return ()
-    category = rre.ESTIMATE if verdict == rre.SUPPORTED_ESTIMATE else "DIAGNOSTIC ONLY"
+    category = {rre.SUPPORTED_ESTIMATE: rre.ESTIMATE,
+                spe.FREQUENCY_ONLY: "PRIMARY RESEARCH ESTIMATE: FREQUENCY-ONLY DIAGNOSTIC HYPOTHESIS",
+                spe.COMPETING: "COMPETING FREQUENCY-ONLY HYPOTHESIS, NOT CHOSEN"}.get(verdict, "DIAGNOSTIC ONLY")
     if s["alternatives"]:
         rows = []
         for a in s["alternatives"]:
@@ -825,18 +850,27 @@ def stiffness_rows(block: dict) -> tuple:
 
 CONSTANT_HEADERS = ("Quantity", "Value", "Category")
 CONSTANT_KIND_TEXT = {"CONDITIONAL_ENGINEERING_CONSTANTS": "CONDITIONAL RESEARCH ESTIMATE",
-                      "AXIS_FREE_VALUES": "RESEARCH ESTIMATE WITHOUT A MATERIAL AXIS", "DIAGNOSTIC_ONLY_VALUES": "DIAGNOSTIC ONLY"}
+                      "AXIS_FREE_VALUES": "RESEARCH ESTIMATE WITHOUT A MATERIAL AXIS", "DIAGNOSTIC_ONLY_VALUES": "DIAGNOSTIC ONLY",
+                      spe.PLATE_AXIS_VALUES: "CONDITIONAL ON THE THICKNESS: FREQUENCY-ONLY DIAGNOSTIC HYPOTHESIS"}
 
 
 def constant_rows(block: dict) -> tuple:
     c = block["constants"]
     category = CONSTANT_KIND_TEXT.get(c["kind"], c["kind"])
-    return tuple((name, f"{value:.0f} MPa ({value / 1000.0:.3f} GPa)" if isinstance(value, (int, float)) else str(value),
-                  category if isinstance(value, (int, float)) else "NOTE") for name, value in c["rows"])
+    rows = [(name, f"{value:.0f} MPa ({value / 1000.0:.3f} GPa)" if isinstance(value, (int, float)) else str(value),
+             category if isinstance(value, (int, float)) else "NOTE") for name, value in c["rows"]]
+    span = c.get("thickness_range_mm")
+    for name, low, high in c.get("thickness_rows") or ():  # PLATE-DIRECT-ESTIMATION-01: exact scaling, no refit
+        rows.append((f"{name}, over the stated thickness {span[0]:g} to {span[1]:g} mm",
+                     f"{low:.0f} to {high:.0f} MPa ({low / 1000.0:.3f} to {high / 1000.0:.3f} GPa)",
+                     "THICKNESS-DEPENDENT RANGE (exact scaling, mass held): one input's interval, not a confidence interval"))
+    return tuple(rows)
 
 
 def constants_note(block: dict) -> str:
     c = block["constants"]
+    if c["kind"] == spe.PLATE_AXIS_VALUES:
+        return (f"Conditional on: {c['conditions']}. " + " ".join(c["reasons"]) + " " + c.get("thickness_note", ""))
     if c["kind"] == "CONDITIONAL_ENGINEERING_CONSTANTS":
         return (f"Conditional on: {c['conditions']}. Material axis 1 as declared (evidence: {c.get('axis_evidence', '')}). "
                 "Research estimates of the Ritz model, not verified material constants.")
@@ -914,11 +948,16 @@ def open_saved_registered(path) -> tuple:
     """(result, stability, block): ``open_saved`` and, when the export holds one, its registered-estimation part with the
     presentation computed again from the saved facts. ``block`` is None for an export of the INP route."""
     result, stability = open_saved(path)
-    block = rre.block_from_export(rft.read_export(path), result)
+    document = rft.read_export(path)
+    block = rre.block_from_export(document, result)
+    if block is None:  # PLATE-DIRECT-ESTIMATION-01: or the standalone plate part, checked by its own service
+        block = spe.block_from_export(document, result)
     if block is not None:
         try:
             for rows in (stiffness_rows, constant_rows, statement_rows, branch_rows, frame_rows):
                 rows(block)
+            if is_standalone(block):
+                identity_rows(block), competing_rows(block), ambiguity_text(block)
             constants_note(block), presentation_text(block)
             for key in ("reference", "fitted"):
                 table = block["correspondence"].get(key)
@@ -1020,7 +1059,8 @@ def uncertainty_range_rows(uncertainty: dict) -> tuple:
             rows.append((head, item["assumption"], item["method"], f"NOT_ASSESSED: {item['reason']}")
                         + ("—",) * (len(rru.QUANTITIES) - 1))
             continue
-        note = "" if item.get("presentation") in (None, rre.SUPPORTED_ESTIMATE) else " (that refit is diagnostic only)"
+        note = ("" if item.get("presentation") in (None, rre.SUPPORTED_ESTIMATE, spe.FREQUENCY_ONLY)
+                else " (that refit is diagnostic only)")
         rows.append((head, item["assumption"], item["method"] + note)
                     + tuple(f"{item['change'][q]:+.2%}" for q in rru.QUANTITIES))
     return tuple(rows)
@@ -1063,16 +1103,22 @@ def summary_rows(result: rft.TuningResult, block: dict, stability: Optional[dict
     if verdict == rre.NO_ESTIMATE:
         d_text = "No estimate: " + " ".join(block["presentation"]["reasons"])
     elif stiffness["alternatives"]:
-        d_text = "Two alternatives, neither chosen: " + "; ".join(
+        d_text = ("Two alternatives, neither chosen: " if verdict != spe.COMPETING else
+                  f"{len(stiffness['alternatives'])} competing minima, none chosen: ") + "; ".join(
             f"{a['alternative']}: D11 {a['D11']:.4f}, D22 {a['D22']:.4f}, D66 {a['D66']:.4f} N m" for a in stiffness["alternatives"])
     else:
         v = stiffness["values"]
         d_text = (f"D11 {v['D11']:.4f} (x = {stiffness['frame']['x']}), D22 {v['D22']:.4f} (y = {stiffness['frame']['y']}), "
                   f"D66 {v['D66']:.4f}, D12 {v['D12']:.4f} N m. D12 is the fixed relation nu12 x D22, not an estimate."
-                  + ("" if verdict == rre.SUPPORTED_ESTIMATE else " DIAGNOSTIC ONLY."))
+                  + ("" if verdict == rre.SUPPORTED_ESTIMATE else " FREQUENCY-ONLY DIAGNOSTIC HYPOTHESIS."
+                     if verdict == spe.FREQUENCY_ONLY else " DIAGNOSTIC ONLY."))
     e_text = "; ".join(f"{name}: {value:.0f} MPa" if isinstance(value, (int, float)) else f"{name}: {value}"
                        for name, value in constants["rows"]) or "none given"
     e_text = f"{CONSTANT_KIND_TEXT.get(constants['kind'], constants['kind'])}. {e_text}. " + " ".join(constants["reasons"])
+    if constants.get("thickness_rows"):
+        span = constants["thickness_range_mm"]
+        e_text += (f" Over the stated thickness {span[0]:g} to {span[1]:g} mm (exact scaling, mass held): " + "; ".join(
+            f"{name} {low:.0f} to {high:.0f} MPa" for name, low, high in constants["thickness_rows"]) + ".")
     if stability:
         numerical = stability["assessment"]["numerical_stability"]
         stable = (f"Leave-one-out: {numerical['verdict']} ("
@@ -1084,22 +1130,28 @@ def summary_rows(result: rft.TuningResult, block: dict, stability: Optional[dict
               + ("; two of them with the in-plane moduli exchanged (axis ambiguity, neither chosen)"
                  if result.status == rft.MIRROR else ""))
     condition = "—" if result.condition_number is None else f"{result.condition_number:.3g}"
+    registration = ("2. Registration", f"{r.get('kind', '')}, hash {r.get('registration_hash', '')}"
+                                       + (f"; confirmed by {r['confirmed_by']} on {r.get('confirmed_at', '')}; evidence: "
+                                          f"{r.get('evidence_location', '')}" if r.get("confirmed_by") else "")
+                                       + ". A confirmation is a person's statement, not an independent proof.")
+    modes = ("3. Mode correspondence and MAC", (f"FE / EXP pairs of the comparison: {len(pairs)}"
+                                               + (f", MAC {min(macs):.3f} to {max(macs):.3f}" if macs else "") + ". "
+                                               + correspondence["statement"] + " "
+                                               + (f"By shape at the reference: {len(reference.get('contradicting', []))} FIT "
+                                                  f"record(s) contradict, {len(reference.get('uncertain', []))} are uncertain. "
+                                                  if shaped else "")
+                                               + f"Branches: {branch['verdict']}. A MAC shows that shapes are alike on the "
+                                                 "measured DOFs only; it identifies no material."))
+    if is_standalone(block):  # PLATE-DIRECT-ESTIMATION-01: no registration, no FE model, no shape comparison
+        registration = ("2. Registration", "NONE. Standalone plate: no FE model and no physical point mapping. The plate "
+                                           "is the one entered by the user; no measured shape is placed on it.")
+        modes = ("3. Mode correspondence and ambiguity", block["identities"]["statement"])
     return (
         ("1. Experimental source", f"{s.get('experimental_file', '')}, SHA-256 {s.get('experimental_sha256', '')}; modal set "
                                    f"{s.get('modal_set_title', '')}; records " + ", ".join(
                                        f"{record} ({hz:.3f} Hz)" for record, hz in block["records"]) + "."),
-        ("2. Registration", f"{r.get('kind', '')}, hash {r.get('registration_hash', '')}"
-                            + (f"; confirmed by {r['confirmed_by']} on {r.get('confirmed_at', '')}; evidence: "
-                               f"{r.get('evidence_location', '')}" if r.get("confirmed_by") else "")
-                            + ". A confirmation is a person's statement, not an independent proof."),
-        ("3. Mode correspondence and MAC", (f"FE / EXP pairs of the comparison: {len(pairs)}"
-                                           + (f", MAC {min(macs):.3f} to {max(macs):.3f}" if macs else "") + ". "
-                                           + correspondence["statement"] + " "
-                                           + (f"By shape at the reference: {len(reference.get('contradicting', []))} FIT "
-                                              f"record(s) contradict, {len(reference.get('uncertain', []))} are uncertain. "
-                                              if shaped else "")
-                                           + f"Branches: {branch['verdict']}. A MAC shows that shapes are alike on the "
-                                             "measured DOFs only; it identifies no material.")),
+        registration,
+        modes,
         ("4. FIT / HOLDOUT residuals", f"FIT: {quality.get('verdict')}, RMS {_rms(quality.get('fit_rms_ln'))} (ln f) over "
                                        f"records {', '.join(str(row['record']) for row in fit_rows) or 'none'}. HOLDOUT (not "
                                        f"fitted): {quality.get('holdout_verdict')}, RMS {_rms(quality.get('holdout_rms_ln'))} "
@@ -1133,7 +1185,10 @@ def summary_text(result: rft.TuningResult, block: dict, stability: Optional[dict
                  uncertainty: Optional[dict] = None, saved_from: str = "") -> str:
     """The readable research summary of a registered result, as plain text. It is a rendering of the result and of the
     parts saved with it; nothing is calculated for it."""
-    lines = ["RESEARCH SUMMARY - registered modal data against a Kirchhoff-Ritz plate", "=" * 78, rre.LABEL, rft.RESULT_LABEL, ""]
+    standalone = is_standalone(block)
+    lines = ["RESEARCH SUMMARY - " + ("standalone plate: measured frequencies" if standalone else "registered modal data")
+             + " against a Kirchhoff-Ritz plate", "=" * 78, block.get("label", rre.LABEL) if standalone else rre.LABEL,
+             rft.RESULT_LABEL, ""]
     if saved_from:
         lines += [f"Rendered from the saved result {saved_from}. A saved result is a historical snapshot: its sources and "
                   "registration were not revalidated and nothing was recalculated.", ""]
@@ -1145,6 +1200,11 @@ def summary_text(result: rft.TuningResult, block: dict, stability: Optional[dict
                 ("Seven separate statements", ("Statement", "Verdict", "Basis"), statement_rows(block)),
                 ("Fixed branches", BRANCH_HEADERS, branch_rows(block)),
                 ("What is measured, declared, imported, computed and estimated", QUANTITY_HEADERS, quantity_rows(result))]
+    if standalone:
+        sections[4:5] = [("Minima reached from the starts (competing hypotheses; none is chosen)", COMPETING_HEADERS,
+                          competing_rows(block)),
+                         ("Mode identities: every one unresolved (frequency rank only)", IDENTITY_HEADERS,
+                          identity_rows(block))]
     table = block["correspondence"].get("reference")
     if table:
         sections.insert(1, ("Fixed correspondence against the reviewed shapes", CORRESPONDENCE_HEADERS,
@@ -1161,6 +1221,161 @@ def summary_text(result: rft.TuningResult, block: dict, stability: Optional[dict
     lines += ["Not quantified", "--------------"] + [f"- {text}" for text in rru.NOT_QUANTIFIED]
     lines += ["", "This summary is a research record. It releases no material property and changes no production status."]
     return "\n".join(lines) + "\n"
+
+
+# ================================================================================================ PLATE-DIRECT-ESTIMATION-01
+
+STANDALONE_TITLE = "1c. Standalone plate (no FE model): measured frequencies and an entered plate"
+STANDALONE_INTRO = ("Estimates the bending stiffnesses D11, D22 and D66 of a flat rectangular plate from a curve-fitted "
+                    "modal file and the plate you enter (length, width, thickness, mass, nu12). No Abaqus, INP or ODB is "
+                    "needed. Only frequencies are used: without an independently established mapping of the measurement "
+                    "points onto the plate no mode shape is compared, so every result is a FREQUENCY-ONLY DIAGNOSTIC "
+                    "HYPOTHESIS, not a verified estimate and not a material property.")
+STANDALONE_NONE = "No modal file chosen. Choose a .unv / .uff file with curve-fitted modes (FRF peak records are refused)."
+STANDALONE_CHOOSE = "Choose modal file (.unv / .uff)..."
+STANDALONE_REFERENCE_NOTE = ("Reference Ex, Ey, Gxy (MPa), optional: for the comparison column only (Ex along the length a). "
+                             "They set neither the start nor the bounds of the fit. Left empty, the column uses the neutral "
+                             "1000 MPa reference, which says nothing about the plate.")
+STANDALONE_RANK_NOTE = ("No shape review exists in this route: the record -> Ritz rank correspondence of section 2 is your "
+                        "frequency hypothesis. Set the roles and any declared ranks, then fix it. The lowest record is "
+                        "never dropped by the program: it stays in the fit unless you exclude it yourself.")
+STANDALONE_RANGES_NOTE = ("A stated thickness range is applied to Ex, Ey and Gxy at once (exact scaling, E ~ thickness^-3 "
+                          "with the mass held). The other ranges are used by the input assessment, which needs one estimate.")
+STANDALONE_CATEGORY_NOTE = ("For each value say what it is: Measured (on the plate itself) or Declared (an engineering "
+                            "assumption). The category is shown with every result.")
+STANDALONE_SAVED_NOTE = (" The experimental file of this saved result was not re-read: nothing of it is carried into a "
+                         "new calculation.")
+STANDALONE_UNCERTAINTY_COMPETING = ("NOT_ASSESSED: the input assessment needs ONE estimate, and this result has competing "
+                                    "minima. The exact thickness scaling is shown with the constants above; D is "
+                                    "proportional to the entered mass.")
+
+
+def is_standalone(block: Optional[dict]) -> bool:
+    return bool(block) and block.get("schema") == spe.SCHEMA
+
+
+def read_standalone(unv_path, cancel: threading.Event) -> spe.PlateModalSet:
+    """The first curve-fitted modal set of an experimental file as the standalone route's modal set. Only the record
+    numbers and frequencies are taken. FRF peak records, an unreadable file and a file that changed while it was read
+    are refused."""
+    title, records, identity, others = read_fitted_records(unv_path, cancel)
+    try:
+        return spe.modal_set(experimental_file=Path(unv_path).name, experimental_path=str(unv_path),
+                             experimental_sha256=str(identity.get("sha256", "")),
+                             experimental_size=int(identity.get("size", 0) or 0), modal_set_title=title, records=records,
+                             other_fitted_sets=others)
+    except rft.TuningRefused as error:
+        raise ReadFailed(str(error)) from error
+
+
+def standalone_identity_rows(pset: spe.PlateModalSet) -> tuple:
+    s = pset.source
+    rows = [("Experimental file", f"{s.get('experimental_path') or s.get('experimental_file', '')} "
+                                  f"({s.get('experimental_size', 0)} bytes)"),
+            ("SHA-256", str(s.get("experimental_sha256", ""))), ("Modal set (curve-fitted)", str(s.get("modal_set_title", ""))),
+            ("Records (as read)", ", ".join(f"{record}: {hz:.4f} Hz" for record, hz in pset.records)),
+            ("Mode shapes and point positions", "not used: no physical point mapping is established in this route"),
+            ("FE model, registration", "none")]
+    if s.get("other_fitted_sets"):
+        rows.insert(3, ("Further fitted sets in the file (not used)", ", ".join(s["other_fitted_sets"])))
+    return tuple(rows)
+
+
+def standalone_sources_changed(pset: spe.PlateModalSet) -> str:
+    """"" when the experimental file on disk is still the file that was read, otherwise the reason."""
+    path = pset.source.get("experimental_path", "")
+    try:
+        now = _file_sha256(path)
+    except OSError as error:
+        return f"the experimental file cannot be read ({error})"
+    return "" if now == pset.source.get("experimental_sha256") else "the experimental file changed on disk"
+
+
+def standalone_confirmation_text(pset: spe.PlateModalSet, plate: rre.Plate, request: rft.TuningRequest,
+                                 ranges: Optional[dict] = None) -> str:
+    """What the user confirms before a standalone fit starts: every input, the fixed hypothesis and the assumptions."""
+    categories = dict(zip(rre.INPUT_NAMES, plate.categories))
+    neutral = tuple(plate.reference) == spe.NEUTRAL_REFERENCE
+    lowest = min(request.observations, key=lambda o: (o.hz, o.record))
+    lines = ["Run ONE bounded research fit of the Ritz model on frequencies only?", "",
+             f"Modal file: {pset.source.get('experimental_file', '')}, SHA-256 "
+             f"{str(pset.source.get('experimental_sha256', ''))[:16]}…, {pset.source.get('modal_set_title', '')}",
+             "FE model: none. Registration: none. No mode shape is compared.", "",
+             "Fixed correspondence (UNVERIFIED frequency-rank hypothesis):"]
+    for o in sorted(request.observations, key=lambda item: item.record):
+        lines.append(f"  record {o.record} ({o.hz:.4f} Hz): {o.role}"
+                     + ("" if o.role == rft.EXCLUDED else f", Ritz rank {o.surrogate_rank}"))
+    lines.append(f"Lowest measured record {lowest.record}: {lowest.role}"
+                 + (" BY YOUR CHOICE (the program does not drop it)." if lowest.role == rft.EXCLUDED else "."))
+    thickness = (ranges or {}).get("thickness")
+    lines += ["", f"Fixed inputs: length {plate.length_mm:g} mm ({categories['length']}), width {plate.width_mm:g} mm "
+                  f"({categories['width']}), thickness {plate.thickness_mm:g} mm ({categories['thickness']}), mass "
+                  f"{plate.mass_g:g} g ({categories['mass']}), nu12 {plate.nu12:g} ({categories['nu12']}).",
+              f"Source of these values: {plate.inputs_source}",
+              "Stated thickness range: " + (f"{thickness[0]:g} to {thickness[1]:g} mm" if thickness else "none"),
+              "Comparison reference: " + ("neutral 1000 MPa (not a statement)" if neutral else
+                                          ", ".join(f"{n} {v:g}" for n, v in zip(("Ex", "Ey", "Gxy"), plate.reference)) + " MPa"),
+              f"Fitted: {request.parameterization} (E1 = Ex along the length, E2 = Ey along the width, G12 = Gxy). Search "
+              f"bounds: the start scaled from the measured frequencies, divided and multiplied by "
+              f"{request.search_factor:g}. Ritz basis degree {request.degree}.",
+              "", "Model assumptions:"] + [f"  - {text}" for text in spe.ASSUMPTIONS]
+    lines += ["", "Research only: the result is a frequency-only diagnostic hypothesis. It is not a verified estimate or a "
+                  "material property, it changes no production status, and this confirmation is not a scientific approval "
+                  "of any value."]
+    return "\n".join(lines)
+
+
+def _standalone_unchanged(pset: spe.PlateModalSet) -> None:
+    changed = standalone_sources_changed(pset)
+    if changed:
+        raise ReadFailed(f"Not started: {changed} after it was read. Choose the file again.")
+
+
+def run_standalone(pset: spe.PlateModalSet, plate: rre.Plate, request: rft.TuningRequest, ranges: Optional[dict],
+                   cancel: threading.Event, progress) -> tuple:
+    """(result, block) of ``standalone_plate_estimation.run_estimation``, once the experimental file is confirmed to be
+    the file that was read. A changed file is a refusal: nothing is fitted on other data."""
+    _standalone_unchanged(pset)
+    return spe.run_estimation(pset, plate, request, cancel, progress, ranges)
+
+
+def run_standalone_uncertainty(pset: spe.PlateModalSet, plate: rre.Plate, request: rft.TuningRequest,
+                               result: rft.TuningResult, ranges: dict, cancel: threading.Event, progress):
+    """The uncertainty service on the standalone route's own fit; None when cancelled."""
+    _standalone_unchanged(pset)
+    return spe.run_uncertainty(pset, plate, request, result, ranges, cancel, progress)
+
+
+IDENTITY_HEADERS = ("EXP record", "EXP (Hz)", "Role", "Fixed Ritz rank (hypothesis)", "Ritz at the lowest minimum (Hz)",
+                    "Ritz rank nearest in frequency", "Mode identity", "Note")
+
+
+def identity_rows(block: dict) -> tuple:
+    rows = []
+    for r in block["identities"]["rows"]:
+        rows.append((str(r["record"]), f"{r['hz']:.4f}", r["role"], "—" if r["rank"] is None else str(r["rank"]),
+                     "—" if r["ritz_hz"] is None else f"{r['ritz_hz']:.3f}",
+                     "—" if r["nearest_rank"] is None else f"rank {r['nearest_rank']} ({r['nearest_hz']:.3f} Hz)",
+                     {spe.UNRESOLVED: "UNRESOLVED (frequency rank only)"}.get(r["status"], r["status"]), r["note"]))
+    return tuple(rows)
+
+
+COMPETING_HEADERS = ("Minimum", "Ex (MPa)", "Ey (MPa)", "Gxy (MPa)", "FIT RMS (ln f)", "HOLDOUT RMS (ln f)", "Status")
+
+
+def competing_rows(block: dict) -> tuple:
+    rows = []
+    for m in block["minima"]:
+        rows.append((str(m["minimum"]), f"{m['E1']:.0f}", f"{m['E2']:.0f}", f"{m['G12']:.0f}", _rms(m.get("fit_rms_ln")),
+                     _rms(m.get("holdout_rms_ln")) if m.get("holdout_rms_ln") is not None else "no HOLDOUT record",
+                     "lowest FIT residual; not chosen" if m["minimum"] == 1 and len(block["minima"]) > 1 else
+                     "the only minimum reached" if len(block["minima"]) == 1 else "competing; not chosen"))
+    return tuple(rows)
+
+
+def ambiguity_text(block: dict) -> str:
+    identities = block["identities"]
+    return identities["statement"]
 
 
 # ================================================================================================ ABM-SOLID-5: solid mode
@@ -1619,7 +1834,8 @@ def abaqus_export_unavailable(result: Optional[rft.TuningResult], sources: Optio
         return ("Export for Abaqus: not available for a saved result, whose INP was not re-read. Choose the files and run "
                 "the tuning.")
     if registered or not sources.inputs.inp_path:
-        return "Export for Abaqus: not available for the registered route, which has no INP material block to write."
+        return ("Export for Abaqus: not available for the registered route or a standalone plate, which have no INP material "
+                "block to write.")
     if result.status == rft.CANCELLED:
         return "Export for Abaqus: the tuning was cancelled."
     if sources.inputs.elastic_type != "ENGINEERING CONSTANTS":

@@ -94,13 +94,16 @@ def quantities(result: rft.TuningResult, plate: rre.Plate) -> dict:
     return {"D11": d.D11, "D22": d.D22, "D66": d.D66, "E_x": fitted["E1"], "E_y": fitted["E2"], "G12": fitted["G12"]}
 
 
-def _refit(rset, plate: rre.Plate, request: rft.TuningRequest, reviewed: bool, cancel, progress) -> dict:
+def _refit(rset, plate: rre.Plate, request: rft.TuningRequest, reviewed: bool, cancel, progress, estimate=None) -> dict:
     """The same fit with the changed plate: its quantities, or the reason there are none."""
     if cancel is not None and cancel.is_set():
         raise _Cancelled()
     try:
-        review = rre.shape_review(rset, plate, request.degree) if reviewed else None
-        result, block = rre.run_estimation(rset, plate, request, review, cancel, progress)
+        if estimate is not None:  # PLATE-DIRECT-ESTIMATION-01: another route's own fit of the changed plate
+            result, block = estimate(plate, request, cancel, progress)
+        else:
+            review = rre.shape_review(rset, plate, request.degree) if reviewed else None
+            result, block = rre.run_estimation(rset, plate, request, review, cancel, progress)
     except rft.TuningRefused as refusal:
         return {"done": False, "reason": str(refusal)}
     if result.status == rft.CANCELLED or block is None:
@@ -132,10 +135,15 @@ def exact_rows(nominal: Mapping[str, float]) -> list:
 
 
 def run_uncertainty(rset: rre.RegisteredSet, plate: rre.Plate, request: rft.TuningRequest, review: Optional[Mapping],
-                    result: rft.TuningResult, ranges: Mapping[str, Sequence[float]], cancel=None, progress=None) -> dict:
+                    result: rft.TuningResult, ranges: Mapping[str, Sequence[float]], cancel=None, progress=None,
+                    estimate=None) -> dict:
     """The sensitivities and the stated ranges of ``result``, which ``run_estimation(rset, plate, request, review)``
     returned. ``ranges``: {input: (low, high)} for the inputs whose range the user stated; the others are
-    NOT_ASSESSED. Returns None when it is cancelled. Refused when the result holds no estimate or a range is invalid."""
+    NOT_ASSESSED. Returns None when it is cancelled. Refused when the result holds no estimate or a range is invalid.
+
+    ``estimate`` (PLATE-DIRECT-ESTIMATION-01), optional: ``(plate, request, cancel, progress) -> (result, block)``, the
+    fit of the route that made ``result`` when it is not the registered one (a standalone plate; ``rset`` then only
+    names the modal set). Every refit goes through it; nothing else changes."""
     if result.status not in (rft.SUPPORTED, rft.MIRROR):
         raise rre.EstimationRefused(rre.INVALID_INPUT, f"There is no estimate to assess: the optimizer status is "
                                                        f"{result.status}.")
@@ -151,7 +159,7 @@ def run_uncertainty(rset: rre.RegisteredSet, plate: rre.Plate, request: rft.Tuni
         nonlocal refits
         refits += 1
         attribute = next(a for n, a, _u in INPUTS if n == name)
-        return _refit(rset, replace(plate, **{attribute: value}), request, reviewed, cancel, progress)
+        return _refit(rset, replace(plate, **{attribute: value}), request, reviewed, cancel, progress, estimate)
 
     try:
         sensitivity = exact_rows(nominal)
