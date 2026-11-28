@@ -280,10 +280,11 @@ class TkTests(_Case):
 class RealArchivedShapeTests(unittest.TestCase):
     """Real UNV + identity-verified archived FE geometry + ARCHIVED CARBON-4C baseline mode shapes (store-gated).
 
-    Exercised: the real engine with the frozen physical registration on real archived mode shapes; the governed MACs
-    of the accepted strict pairs are reproduced, and G2c is VERIFIED; the legacy centred registration gives
-    REFERENCE_ONLY. Not exercised: Abaqus extraction from the ODB (the shapes come from the archived shape pack, TOP
-    surface only, modes 7-17) and the GUI worker.
+    SP02-SP13-LEGACY-REGISTRATION-SUSPENSION-01: the accepted physical registrations are suspended, so the binding
+    of the exact accepted files is refused and no archived evidence is shown for a comparison of them, whatever
+    registration it used. Historical reproduction is unchanged: the real engine with the frozen record read from the
+    repository still reproduces the recorded MACs of the strict pairs. Not exercised: Abaqus extraction from the ODB
+    (the shapes come from the archived shape pack, TOP surface only, modes 7-17) and the GUI worker.
     """
 
     CASES = {"SP02": ("carbon4c/run_sp02/SP02_f3e592281bebce66.odb", "SP-02/SP02_polymax_retry_260803.unv",
@@ -324,19 +325,33 @@ class RealArchivedShapeTests(unittest.TestCase):
                     vectors[rows] = pack.displacements[k]
                     modes.append(ModeShape(number, hz, ids, fe.coordinates, vectors))
                 abaqus = ModalDataset("archived shape pack", odb, modes)
-                governed = ev.bind_accepted_reference(odb, unv, abaqus, experimental)
+                with self.assertRaises(ev.RegistrationSuspended) as suspended:  # the exact accepted files
+                    ev.bind_accepted_reference(odb, unv, abaqus, experimental)
+                self.assertEqual(suspended.exception.specimen, specimen)
+                self.assertIn(ev.SUSPENSION_REASON, str(suspended.exception))
+                with self.assertRaises(ev.RegistrationSuspended):
+                    ev.match_accepted_files(odb, unv)
+                from services.experiment_fixture_regression import load_fixture_registration
+                from services.new_odb_comparison import GeometryReuseSuspended, bind_registration_by_fe_geometry
+
+                with self.assertRaises(GeometryReuseSuspended):  # the other binding route, the same files
+                    bind_registration_by_fe_geometry(unv, abaqus, experimental)
+                physical = load_fixture_registration(fixture, ROOT)  # the frozen record itself, unchanged
+                self.assertIsNotNone(ev.registration_suspension(physical.registration_hash))
                 record = json.loads((ROOT / spec.reevaluation_path).read_text(encoding="utf-8"))["results"]["PHYSICAL"]
                 legacy = FrozenRegistration.from_dict(json.loads(
                     (ROOT / f"docs/registrations/{specimen}_frozen_registration.json").read_text(encoding="utf-8")))
-                for registration, expected in ((governed.registration, ev.VERIFIED), (legacy, ev.REFERENCE_ONLY)):
+                for registration, historical in ((physical, True), (legacy, False)):
                     result = compare_modal_datasets(abaqus, experimental, frozen_registration=registration)
                     result.metadata["comparison_inputs"] = ev.comparison_input_record(odb, unv, fixture.modal_set.name)
-                    if expected == ev.VERIFIED:
+                    if historical:  # historical reproduction: the recorded MACs of the strict pairs
                         macs = {(p.experimental_mode, p.abaqus_mode): p.mac for p in result.pairs}
                         for row in record["strict_pairs"]:
                             self.assertAlmostEqual(macs[(row["experimental_mode"], row["fe_mode"])], row["mac"],
                                                    places=9)
-                    self.assertEqual(ev.check_archived_sensitivity_evidence(result).status, expected)
+                    evidence = ev.check_archived_sensitivity_evidence(result)
+                    self.assertEqual((evidence.status, evidence.rows), (ev.NOT_APPLICABLE, ()))
+                    self.assertIn(ev.SUSPENDED_MARK, evidence.reasons[0])
 
 
 if __name__ == "__main__":

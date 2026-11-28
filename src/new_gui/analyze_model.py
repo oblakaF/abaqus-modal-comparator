@@ -54,11 +54,13 @@ CONFIRMED_COMPARISON = "USER_CONFIRMED_COMPARISON"
 CONFIRMED_TEXT = ("Mode pairs and MAC use the physical registration you confirmed. Your confirmation records your "
                   "statement; it is not independent proof of physical correctness.")
 REFUSED, FAILED, PROVISIONAL, NOT_CONFIRMED = "refused", "failed", "provisional", "not_confirmed"
+SUSPENDED = "suspended"  # the registration these files match is suspended by the service; nothing replaces it
 REGISTRATION_NOTES = {  # what the program shows; the service's own wording stays in ``registration_reason``
     REFUSED: "Registration check: no accepted registration matches these two files.",
     FAILED: "Registration check FAILED: it could not be completed, so nothing about these files is verified.",
     PROVISIONAL: "Registration not checked: the chosen set holds FRF peak records, not validated fitted modes.",
     NOT_CONFIRMED: "Confirmed registration not applied: it does not hold for the current data. See details.",
+    SUSPENDED: rm.SUSPENDED_NOTE,
 }
 VERIFIED_LIMITS = ("Only the registered geometric mapping is reused: frequencies and mode shapes are these files' own. "
                    "No acceptance gate or threshold is changed.")
@@ -413,7 +415,8 @@ def _verified(inputs: Inputs, set_index: int, cancel_event) -> tuple:
     if check.cancelled:
         raise StepCancelled()
     if check.view is None:
-        return None, check.refusal or check.error, REFUSED if check.refusal else FAILED
+        return None, check.refusal or check.error, (SUSPENDED if check.suspended else REFUSED if check.refusal
+                                                    else FAILED)
     compared = cm.run_compare(inputs.full_fe, inputs.full_experimental, set_index, check.view.registration, 0,
                               cancel_event, inputs.identities, scope=(inputs.fe, inputs.experimental))
     if compared.cancelled:

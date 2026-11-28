@@ -15,6 +15,10 @@ file's fresh SHA-256 and size, the FE geometry identity, the modal set's replay 
 sealed registration's content compatibility, whether an accepted registration (SP-02, SP-13) applies, or refuses
 with its reason. A refusal does not say that the user's experiment is physically wrong.
 
+SP02-SP13-LEGACY-REGISTRATION-SUSPENSION-01: the service refuses a suspended registration (the accepted SP-02 and
+SP-13 physical registrations; PSV coordinate normalisation defect, corrected registration pending acceptance). That
+refusal is marked ``RegistrationOutcome.suspended`` so that the program says why; nothing replaces the registration.
+
 The registration is never applied: no MAC is computed, no mode pair or orientation is made, and nothing is saved as
 accepted for the workspace. The result is shown with "Verified archived reference for these selected data only.
 Registration not applied. Modal identity and MAC not established."
@@ -48,6 +52,9 @@ REFUSAL_NOTE = ("No archived registration applies to these data. This does not m
 HINT = ("Checks, with the existing service, whether an accepted archived physical registration applies exactly to "
         "the read FE results and to the modal set chosen above for the frequency diagnostic. Nothing is applied: no "
         "orientation, node correspondence, MAC or mode pair is made, and nothing is saved for your workspace.")
+SUSPENDED_NOTE = ("Registration suspended: PSV coordinate normalisation defect; corrected registration pending "
+                  "acceptance. It is not applied and nothing replaces it: no mode pairs and no MAC. Frequency "
+                  "comparison and individual mode shapes remain available.")
 NO_SET = "No modal set chosen above."
 PROVISIONAL_TEXT = dm.PROVISIONAL_TEXT
 IDLE, RUNNING, VERIFIED_STATE, REFUSED, FAILED = "idle", "running", "verified", "refused", "failed"
@@ -82,6 +89,7 @@ class RegistrationOutcome:
     refusal: str = ""
     error: str = ""
     cancelled: bool = False
+    suspended: bool = False  # the refusal is the service's suspension of the registration these data match
 
 
 def set_is_provisional(experimental_preview, set_index: Optional[int]) -> bool:
@@ -121,7 +129,7 @@ def registration_view(bound, experimental_preview, set_index: int) -> Registrati
 def run_check(fe_preview, experimental_preview, set_index: int, token: int,
               cancel_event: threading.Event) -> RegistrationOutcome:
     """``check`` as an outcome; a refusal is the service's reason, never an exception (worker thread)."""
-    from services.new_odb_comparison import AcceptedReferenceRefusal
+    from services.new_odb_comparison import AcceptedReferenceRefusal, RegistrationSuspended
 
     try:
         with SERVICE_LOCK:
@@ -132,7 +140,7 @@ def run_check(fe_preview, experimental_preview, set_index: int, token: int,
     except AcceptedReferenceRefusal as refusal:
         if cancel_event.is_set():
             return RegistrationOutcome(token, cancelled=True)
-        return RegistrationOutcome(token, refusal=str(refusal))
+        return RegistrationOutcome(token, refusal=str(refusal), suspended=isinstance(refusal, RegistrationSuspended))
     except Exception as error:  # noqa: BLE001  (cancellation, the service's errors or anything unexpected)
         if cancel_event.is_set() or type(error).__name__ == "SensitivityCheckCancelled":
             return RegistrationOutcome(token, cancelled=True)

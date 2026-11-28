@@ -12,6 +12,8 @@ alone (``GeometryOrientationAmbiguousError``). Two outcomes replace a discarded 
    the accepted baseline ODB (its content is not hashed here), and archived sensitivities apply only when the
    separate check (11. Scaling) verifies the ODB as the accepted baseline ODB by SHA-256.
    A different geometry, experimental file or modal set, or an unverifiable registration, refuses the reuse.
+   A suspended registration (``archived_sensitivity_evidence.SUSPENDED_REGISTRATIONS``) is refused with
+   ``GeometryReuseSuspended`` and nothing replaces it.
 
 2. ``frequency_only_diagnostic``: otherwise the extracted Abaqus frequencies, the PolyMAX frequencies and their
    differences are shown as ``FREQUENCY_ONLY_DIAGNOSTIC``. No orientation is chosen and no MAC is computed; the
@@ -32,7 +34,12 @@ from quality_control import RIGID_SHAPE_RESIDUAL_THRESHOLD
 from reviewed_core import frequency_error_percent
 from scientific_state import modal_dataset_geometry_identity
 from services import archived_sensitivity_evidence as evidence
-from services.archived_sensitivity_evidence import AcceptedReferenceRefusal, fresh_content_identity
+from services.archived_sensitivity_evidence import (
+    AcceptedReferenceRefusal,
+    RegistrationSuspended,
+    fresh_content_identity,
+    require_registration_not_suspended,
+)
 from services.experiment_fixture_regression import (
     FixtureRegressionError,
     load_fixture_registration,
@@ -58,6 +65,11 @@ RIGID_BODY_CRITERION = (
 
 class GeometryReuseRefusal(AcceptedReferenceRefusal):
     """The accepted physical registration cannot be reused for this ODB / experimental file; the message says why."""
+
+
+class GeometryReuseSuspended(GeometryReuseRefusal, RegistrationSuspended):
+    """The registration these files match is suspended (``evidence.SUSPENDED_REGISTRATIONS``): it is not reused and
+    nothing replaces it, so the callers keep the frequency-only diagnostic."""
 
 
 def _short(digest: object) -> str:
@@ -148,11 +160,14 @@ def bind_registration_by_fe_geometry(experimental_path: Path, abaqus, experiment
              "the physical mapping is not reused.")
     checks.append(f"FE geometry identity {_short(fe_geometry['sha256'])} ({fe_geometry['node_count']} nodes) = "
                   f"accepted {spec.specimen} FE geometry ({fixture.fe.model_name})")
+    # the files are exactly those of this registration: a suspended one is refused here and never replaced
+    require_registration_not_suspended(fixture.registration.registration_hash, error=GeometryReuseSuspended)
     try:
         registration = load_fixture_registration(fixture, repo_root)
         report = verify_fixture_dataset(fixture, registration, experimental_dataset)
     except FixtureRegressionError as error:
         raise GeometryReuseRefusal(f"fixture {fixture.fixture_id}: {error}") from error
+    require_registration_not_suspended(registration.registration_hash, error=GeometryReuseSuspended)
     checks.append(f"PolyMAX modal set {report.modal_set_key!r} ({report.mode_count} modes, {report.point_count} "
                   f"points, measured {'/'.join(report.measured_dofs)}) replays the frozen registration")
     try:

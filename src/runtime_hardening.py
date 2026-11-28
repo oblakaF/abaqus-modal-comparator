@@ -15,6 +15,7 @@ from coordinate_calibration import CoordinateCalibration
 from reviewed_core import GeometryOrientationAmbiguousError
 from services.archived_sensitivity_evidence import (
     AcceptedReferenceRefusal,
+    RegistrationSuspended,
     SensitivityCheckCancelled,
     bind_accepted_reference,
     comparison_input_record,
@@ -271,6 +272,19 @@ def install_runtime_hardening(app_module) -> None:
                 except SensitivityCheckCancelled as error:
                     raise AnalysisCancelled("Analysis stopped by user.") from error
                 except AcceptedReferenceRefusal as error:
+                    if isinstance(error, RegistrationSuspended):
+                        # the suspended registration is not applied and not replaced; the frequencies stay available
+                        # as a frequency-only diagnostic (no orientation, no MAC, no pair)
+                        diagnostic = frequency_only_diagnostic(abaqus_data, experiment_data, str(error))
+                        loaded.frequency_diagnostic = diagnostic
+                        loaded.reason = diagnostic.reason
+                        try:
+                            (cache / "frequency_only_diagnostic.json").write_text(
+                                json.dumps(diagnostic.to_dict(), indent=2), encoding="utf-8")
+                            (cache / "modal_data_inventory.json").write_text(
+                                json.dumps(loaded.inventory(), indent=2, default=str), encoding="utf-8")
+                        except OSError:
+                            pass
                     raise GovernedRegistrationRefused(
                         f"Accepted physical registration refused: {error} The comparison was not run with any "
                         "other registration; clear the option to use automatic geometry registration."

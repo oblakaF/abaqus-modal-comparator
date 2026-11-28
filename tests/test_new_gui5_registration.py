@@ -170,6 +170,22 @@ class ServiceTests(WorldCase):
         self.assertIn("modal_set", refused.refusal)
         self.assertIsNotNone(self.run_model(fe, experimental, 0).view)  # the accepted set alone is verified
 
+    def test_a_suspended_registration_is_refused_with_its_reason(self):
+        # SP02-SP13-LEGACY-REGISTRATION-SUSPENSION-01: the service's suspension is a refusal, marked as such
+        fe, experimental = self.previews()
+        digest = self.world.registrations["SP02"].registration_hash
+        suspension = ev.RegistrationSuspension("SP02", "SP02/bravo-1-physical", "synthetic", digest)
+        self.assertIsNotNone(self.run_model(fe, experimental).view)  # not suspended: verified as before
+        with mock.patch.object(ev, "SUSPENDED_REGISTRATIONS", {digest: suspension}):
+            outcome = self.run_model(fe, experimental)
+        self.assertIsNone(outcome.view)
+        self.assertTrue(outcome.suspended)
+        self.assertEqual(outcome.refusal, suspension.message())
+        self.assertIn("PSV coordinate normalisation defect; corrected registration pending acceptance", outcome.refusal)
+        self.assertIn(ev.SUSPENSION_REASON, rm.SUSPENDED_NOTE)
+        refused = self.run_model(*self.previews(fe=new_odb_dataset(self.odb, self.fe, shift=0.5)))
+        self.assertFalse(refused.suspended)  # any other refusal keeps its own reason
+
     def test_nothing_applied_compared_paired_or_read_again(self):
         fe, experimental = self.previews()
         import abaqus_bridge

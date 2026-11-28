@@ -148,6 +148,71 @@ class AcceptedReferenceRefusal(ValueError):
 _Refusal = AcceptedReferenceRefusal
 
 
+# ----------------------------------------------------------------------------- suspended registrations
+
+# SP02-SP13-LEGACY-REGISTRATION-SUSPENSION-01 (owner-authorised, temporary). The two accepted physical registrations
+# below were built on PSV scan-point coordinates that the legacy normalisation placed wrongly, so their
+# measured-point-to-FE-node mapping must not produce a verified MAC, a confirmed mode pair or an identification input
+# until a corrected registration is accepted. They are named by their exact frozen identity (the sealed registration
+# hash); nothing else is suspended, nothing is replaced, and the frozen records themselves are unchanged.
+# The two binding routes refuse them: ``bind_accepted_reference`` (with ``match_accepted_files`` and
+# ``check_archived_sensitivity_evidence``) here and ``services.new_odb_comparison.bind_registration_by_fe_geometry``.
+# Not suspended: ``accepted_physical_freeze`` and the re-evaluation tools, which only read or reproduce the historical
+# records and compare nothing for the user's files.
+SUSPENSION_ID = "SP02-SP13-LEGACY-REGISTRATION-SUSPENSION-01"
+SUSPENDED_MARK = "REGISTRATION SUSPENDED"
+SUSPENSION_REASON = "PSV coordinate normalisation defect; corrected registration pending acceptance."
+SUSPENSION_EFFECT = ("The registration is not applied and no other registration is used in its place: no verified MAC, "
+                     "no confirmed mode pair and no identification input comes from it. Frequency diagnostics and "
+                     "individual mode shapes remain available.")
+
+
+@dataclass(frozen=True)
+class RegistrationSuspension:
+    """One suspended registration, named by its exact frozen identity."""
+
+    specimen: str
+    fixture_id: str
+    registration_file: str
+    registration_hash: str
+    reason: str = SUSPENSION_REASON
+    suspension_id: str = SUSPENSION_ID
+
+    def message(self) -> str:
+        return (f"{SUSPENDED_MARK}: the accepted {self.specimen} physical registration {_short(self.registration_hash)} "
+                f"({self.fixture_id}) is temporarily suspended ({self.suspension_id}). {self.reason} "
+                f"{SUSPENSION_EFFECT}")
+
+
+SUSPENDED_REGISTRATIONS: Mapping[str, RegistrationSuspension] = {item.registration_hash: item for item in (
+    RegistrationSuspension("SP02", "SP02/bravo-1-physical", "docs/registrations/SP02_physical_registration.json",
+                           "9b63f6c891331ba55a6ee2797f142bf0b75117d9bffbf3ab312ee08a418e882c"),
+    RegistrationSuspension("SP13", "SP13/best-physical", "docs/registrations/SP13_physical_registration.json",
+                           "2eeeaa8698851baf33c640a5e741a91a67c6629b436700a920ba9333061cd823"),
+)}
+
+
+class RegistrationSuspended(AcceptedReferenceRefusal):
+    """The registration is one of ``SUSPENDED_REGISTRATIONS``; it is refused, never replaced."""
+
+    def __init__(self, suspension: RegistrationSuspension) -> None:
+        super().__init__(suspension.message(), suspension.specimen)
+        self.suspension = suspension
+
+
+def registration_suspension(registration_hash: object) -> Optional[RegistrationSuspension]:
+    """The suspension of exactly this sealed registration hash, or None (every other registration)."""
+    return SUSPENDED_REGISTRATIONS.get(str(registration_hash))
+
+
+def require_registration_not_suspended(*registration_hashes: object, error=RegistrationSuspended) -> None:
+    """Raise ``error`` (a ``RegistrationSuspended``) when one of the hashes is a suspended registration."""
+    for registration_hash in registration_hashes:
+        suspension = registration_suspension(registration_hash)
+        if suspension is not None:
+            raise error(suspension)
+
+
 @dataclass(frozen=True)
 class AcceptedReference:
     """An accepted specimen reference bound to the exact compared files and loaded datasets."""
@@ -540,6 +605,7 @@ def match_accepted_files(odb_path: Path, experimental_path: Path, *, repo_root: 
     except (OSError, ValueError, KeyError) as error:
         raise _Refusal(f"accepted fixture manifest unavailable: {error}") from error
     spec, fixture = _select_specimen(fixtures, odb, experimental)
+    require_registration_not_suspended(fixture.registration.registration_hash)  # the option is never offered
     return spec, fixture, odb, experimental
 
 
@@ -549,7 +615,8 @@ def bind_accepted_reference(odb_path: Path, experimental_path: Path, abaqus, exp
 
     Fresh SHA-256 of both files; the PolyMAX modal set, points and measured-DOF contract replay the frozen physical
     registration; the sealed registration is content-compatible with the loaded files and every mapped FE node is
-    present. ``checks`` collects the passed checks (also on refusal).
+    present. ``checks`` collects the passed checks (also on refusal). A suspended registration
+    (``SUSPENDED_REGISTRATIONS``) is refused with ``RegistrationSuspended``.
     """
 
     checks = [] if checks is None else checks
@@ -564,6 +631,7 @@ def bind_accepted_reference(odb_path: Path, experimental_path: Path, abaqus, exp
             report = verify_fixture_dataset(fixture, registration, experimental_dataset)
         except FixtureRegressionError as error:
             raise _Refusal(f"fixture {fixture.fixture_id}: {error}") from error
+        require_registration_not_suspended(registration.registration_hash)  # the sealed record actually loaded
         checks.append(f"PolyMAX modal set {report.modal_set_key!r} ({report.mode_source}; {report.mode_count} modes, "
                       f"{report.point_count} points, measured {'/'.join(report.measured_dofs)}) replays the frozen "
                       "registration's points and measured-DOF contract")
@@ -581,6 +649,8 @@ def bind_accepted_reference(odb_path: Path, experimental_path: Path, abaqus, exp
                       f") is content-compatible: FE geometry {_short(fe_identity['sha256'])} "
                       f"({fe_identity['node_count']} nodes); all {len(registration.mapped_fe_node_ids)} mapped FE nodes present")
         _check_cancelled(cancel)
+    except RegistrationSuspended:
+        raise
     except AcceptedReferenceRefusal as refusal:
         raise AcceptedReferenceRefusal(str(refusal), spec.specimen) from refusal
     return AcceptedReference(spec, fixture, registration, tuple(checks))
